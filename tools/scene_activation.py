@@ -14,6 +14,10 @@ from inspect_fsm import decode_param
 
 
 MAX_NODES = 2048
+# Set by the player builder (tools/psp/hkpsp_build.py). Hash-verified source records are
+# shared between the compilers one scene conversion builds (metadata and export_scene).
+SHARE_VERIFIED_READS = os.environ.get('HKPSP_FAST_CHECKPOINT') == '1'
+_VERIFIED_READS = {}
 MAX_TARGETS = 8192
 TARGET_KINDS = {'visual': 0, 'collider': 1, 'gate': 2, 'spawn': 3, 'hazard': 4, 'acid_water': 5}
 DEACTIVATORS = ('DeactivateIfPlayerdataFalse', 'DeactivateIfPlayerdataTrue')
@@ -83,13 +87,21 @@ class ActivationCompiler:
                                               for key, value in self._source_hashes.items()}
         path = resolved
         if path not in self._cache:
-            raw = path.read_bytes()
             expected = self._source_hashes.get(path)
             if expected is None and self._canonical_hashes is not None:
                 expected = self._canonical_hashes.get(path)
-            if expected and hashlib.sha256(raw).hexdigest() != expected:
-                raise ValueError('Changed activation source: ' + str(path))
-            self._cache[path] = json.loads(raw)
+            shared = _VERIFIED_READS.get(path) if SHARE_VERIFIED_READS and expected else None
+            if shared is not None and shared[0] == expected:
+                # Player builds: a second compiler in this process reuses records already
+                # checked against the same source hash instead of re-reading and re-parsing.
+                self._cache[path] = shared[1]
+            else:
+                raw = path.read_bytes()
+                if expected and hashlib.sha256(raw).hexdigest() != expected:
+                    raise ValueError('Changed activation source: ' + str(path))
+                self._cache[path] = json.loads(raw)
+                if SHARE_VERIFIED_READS and expected:
+                    _VERIFIED_READS[path] = (expected, self._cache[path])
         self._resolved_refs[Path(ref)] = path
         return self._cache[path]
 
