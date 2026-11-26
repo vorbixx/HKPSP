@@ -11,7 +11,8 @@ the game data yourself from your own Steam copy of Hollow Knight.
 
 ## What works
 
-- Native 480×272 rendering at a fixed 30 FPS.
+- Native 480×272 rendering at a fixed 30 FPS on PSP-2000/3000. The PSP-1000
+  has less memory and streams its textures, so its frame rate is lower.
 - Movement, jumping, nail combat, spells, damage, Soul and healing.
 - Room loading, transitions, collision, cameras, doors, switches, lifts,
   breakable floors, walls and ceilings.
