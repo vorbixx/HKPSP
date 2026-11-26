@@ -562,7 +562,7 @@ bool TutorialSession::restart(bool retry)
     focusEffects.reset();
     if(!retry){abilityFlags_=0;watcherProgress={};uumuuProgress={};conditionalEvents.setDreamNailOwned(false);resting.saved={};}
     if(!retry)cartographer.progress={};
-    cartographer.progress.visitRoom(mapRoomIndex(sceneName()));
+    cartographer.progress.visitRoom(savedMapRoomIndex(sceneName()));
     cartographer.enter(sceneName(),playerData_.get("openedMapperShop")!=0);
     decorEffects.reset();
     if(sceneActive_){
@@ -907,7 +907,7 @@ void TutorialSession::advance(double seconds,InputLatch& input,const Vec2* emitt
     sceneEnemies.setGreed(greed);greenpath.setGreed(greed);enemyCRewards_.setGreed(greed);
 
     if(!rules_||!std::isfinite(seconds)||charmsPage.open)return;
-    if(worldQuests.talking()&&!worldQuestCallbackAllowed()){
+    if(dialogueQuest().talking()&&!worldQuestCallbackAllowed()){
         worldQuestInteraction(WorldQuestInteraction::Cancel);
     }
     if(furyChest.gotCharm6())charmInventory.owned|=charmBit(6);
@@ -1650,11 +1650,22 @@ void TutorialSession::resetWorldQuest()
 {
     if(worldQuestDialogue.locked())simulation.animator.overrideClip=nullptr;
     const auto* field=WorldQuests::playerDataField(worldQuests.definition().event);
-    worldQuests.enter(sceneName(),collectibles.saved(),field&&playerData_.get(field)!=0);
+    bool absent=field&&playerData_.get(field)!=0;
+    if(worldQuests.definition().event==WorldQuestEvent::Quirrel){
+        const auto* scene=sceneName();
+        if(!std::strcmp(scene,"Fungus2_01"))absent=hasAbility(AbilityReward::MantisClaw);
+        else if(!std::strcmp(scene,"Fungus2_14"))absent=playerData_.get("quirrelArchiveEncountered")!=0;
+        else if(!std::strcmp(scene,"Ruins1_02"))absent=playerData_.get("quirrelCityLeft")||playerData_.get("mageLordDefeated");
+        else if(!std::strcmp(scene,"Fungus3_47"))absent=uumuuProgress.encounteredMegaJelly;
+    }
+    worldQuests.enter(sceneName(),collectibles.saved(),absent);
+    tiso.enter(sceneName(),collectibles.saved(),!hasAbility(AbilityReward::MothwingCloak)||playerData_.get("tisoEncounteredTown"));
+    talkingToTiso=false;
     worldQuestDialogue.reset();
 }
 bool TutorialSession::worldQuestCallbackAllowed() const
 {
+    const auto& worldQuests=dialogueQuest();
     const auto& h=simulation.hero;
     return !std::strcmp(sceneName(),worldQuests.definition().scene)&&
         flow.phase==RoomPhase::Playing&&h.vitals.health>0&&h.actor!=Actor::Dead&&h.actor!=Actor::Damage&&
@@ -1781,9 +1792,10 @@ void TutorialSession::updateWorldQuest(float seconds)
         if(owned)releaseDoorControl();
         if(ui.prompt||owned)return;
     }
-    if(waterways.bound()){
+    if(waterways.bound()&&(!ui.locked()||waterways.controlsHero())){
         const auto* turn=heroBank_?heroBank_->find("Turn"):nullptr;
         const bool owned=waterways.controlsHero();
+        const bool previousUp=ui.upHeld;
         if(waterways.update(seconds,h,bodyBounds(h.position),ui,
             flow.phase==RoomPhase::Playing&&!inspection.locked()&&!worldQuests.talking()&&
             !furyChest.collecting()&&h.actor!=Actor::Dead&&h.actor!=Actor::Damage,
@@ -1797,6 +1809,7 @@ void TutorialSession::updateWorldQuest(float seconds)
         }
         if(owned)releaseDoorControl();
         if(ui.prompt||owned)return;
+        ui.upHeld=previousUp;
     }
     if(cityCrest.bound()){
         const auto* turn=heroBank_?heroBank_->find("Turn"):nullptr;
@@ -1831,6 +1844,7 @@ void TutorialSession::updateWorldQuest(float seconds)
     }
     ui.promptLabel[0]=0;
     worldQuests.step(seconds);
+    tiso.step(seconds);
     if(slyShopVisible())slyShopAnimation.advance(seconds);
     const bool wasLocked=ui.locked(),up=h.input.y>.5f;
     if(flow.phase==RoomPhase::Playing&&h.vitals.health>0&&h.actor!=Actor::Dead&&
@@ -1841,26 +1855,31 @@ void TutorialSession::updateWorldQuest(float seconds)
         return;
     }
     ui.step(seconds);ui.observePosition(h.position.x);
+    if(!wasLocked&&!dialogueQuest().talking())talkingToTiso=tiso.nearby(bodyBounds(h.position));
+    auto& quest=dialogueQuest();
     ui.prompt=canTalkWorldQuest()&&!ui.locked()&&!inspection.locked()&&!furyChest.collecting();
     if(ui.prompt&&up&&!ui.upHeld){
+        lemmShopSelected=quest.lemmShopNearby(bodyBounds(h.position));
         const auto* turn=heroBank_?heroBank_->find("Turn"):nullptr;
         const float turnSeconds=turn&&turn->fps>0?float(turn->count)/turn->fps:0;
-        if(worldQuests.definition().event==WorldQuestEvent::Elderbug)
-            ui.approachEither(h.position.x,worldQuests.definition().position.x,2,6,h.facingRight,turnSeconds);
-        else ui.approach(h.position.x,worldQuests.definition().position.x,h.facingRight,turnSeconds);
+        if(talkingToTiso||quest.definition().event==WorldQuestEvent::Elderbug||
+           quest.definition().event==WorldQuestEvent::Quirrel||quest.definition().event==WorldQuestEvent::Seer||
+           quest.definition().event==WorldQuestEvent::Lemm)
+            ui.approachEither(h.position.x,quest.definition().position.x,2,6,h.facingRight,turnSeconds);
+        else ui.approach(h.position.x,quest.definition().position.x,h.facingRight,turnSeconds);
     }
     ui.upHeld=up;
     if(ui.opened()){
-        if(worldQuests.talking()||worldQuestInteraction(WorldQuestInteraction::DialogueOpened))ui.read(worldQuests.text());
+        if(quest.talking()||worldQuestInteraction(WorldQuestInteraction::DialogueOpened))ui.read(quest.text());
         else ui.close();
     }else if(ui.phase()==WorldQuestDialogue::Phase::Reading){
         if((h.input.pressed&(Jump|Attack|Focus|Dash))&&ui.proceed()){
             worldQuestInteraction(WorldQuestInteraction::ConversationFinished);
-            if(worldQuests.talking()){
-                const auto talk=worldQuests.talk();
-                if(worldQuests.definition().event==WorldQuestEvent::BrettaRescued&&
+            if(quest.talking()){
+                const auto talk=quest.talk();
+                if(quest.definition().event==WorldQuestEvent::BrettaRescued&&
                    (talk==WorldQuestTalk::Rescue3||talk==WorldQuestTalk::Rescue4))ui.intermission();
-                else ui.read(worldQuests.text());
+                else ui.read(quest.text());
             }else ui.close();
         }
     }
@@ -1875,14 +1894,14 @@ void TutorialSession::updateWorldQuest(float seconds)
     }
     if(ui.locked()){
         h.controlEnabled=false;h.velocity={ui.velocity(),0};
-        h.facingRight=ui.moving()?ui.facingRight():h.position.x<worldQuests.definition().position.x;
+        h.facingRight=ui.moving()?ui.facingRight():h.position.x<quest.definition().position.x;
     }else if(wasLocked){h.preventCastByDialogueEnd();h.controlEnabled=true;}
 }
 bool TutorialSession::canTalkWorldQuest() const
 {
     const auto& h=simulation.hero;
     // Original HeroController.CanTalk, evaluated before the NPC takes control.
-    return worldQuestCallbackAllowed()&&!worldQuests.talking()&&h.controlEnabled&&h.inputEnabled&&
+    return worldQuestCallbackAllowed()&&!dialogueQuest().talking()&&h.controlEnabled&&h.inputEnabled&&
         h.contacts.ground&&!h.nail.active&&!h.dashing;
 }
 bool TutorialSession::completeWorldQuest(WorldQuestEvent event)
@@ -1945,11 +1964,13 @@ bool TutorialSession::waterwaysHides(unsigned owner) const
 }
 bool TutorialSession::worldQuestInteraction(WorldQuestInteraction event)
 {
+    auto& worldQuests=dialogueQuest();
     if(event==WorldQuestInteraction::Cancel){
         const bool talking=worldQuests.talking(),locked=worldQuestDialogue.locked();
         const bool upHeld=worldQuestDialogue.upHeld||simulation.hero.input.y>.5f;
         if(locked)simulation.animator.overrideClip=nullptr;
         worldQuests.cancelTalk();worldQuestDialogue.reset();
+        lemmShopSelected=false;
         worldQuestDialogue.upHeld=upHeld;
         auto& h=simulation.hero;
         if(locked&&h.vitals.health>0&&h.actor!=Actor::Dead&&h.actor!=Actor::Damage){
@@ -1960,16 +1981,47 @@ bool TutorialSession::worldQuestInteraction(WorldQuestInteraction event)
     }
     if(!worldQuestCallbackAllowed()){worldQuests.cancelTalk();return false;}
     if(event==WorldQuestInteraction::ConversationFinished){
-        if(!worldQuests.finishDialogue())return false;
+        const bool lemmShopIntro=lemmShopSelected&&worldQuests.talk()==WorldQuestTalk::LemmIntro;
+        const bool seer=worldQuests.definition().event==WorldQuestEvent::Seer;
+        if(!worldQuests.finishDialogue(seer&&playerData_.get("completedRGDreamPlant"),
+                                       seer&&playerData_.get("killedGhostXero")))return false;
+        if(lemmShopIntro)return worldQuestInteraction(WorldQuestInteraction::DialogueOpened);
+        lemmShopSelected=false;
         if(worldQuests.talk()==WorldQuestTalk::IntroMain&&!setPlayerData("metElderbug",1))worldQuests.cancelTalk();
         return true;
     }
     if(event!=WorldQuestInteraction::DialogueOpened)return false;
+    if(worldQuests.definition().event==WorldQuestEvent::Lemm){
+        const char* flag=nullptr;
+        if(!worldQuests.beginLemm(lemmShopSelected,playerData_,charmInventory.wears(10),
+                                  hasAbility(AbilityReward::CrystalHeart),flag))return false;
+        if(flag&&!setPlayerData(flag,1)){worldQuests.cancelTalk();return false;}
+        return true;
+    }
+    if(!talkingToTiso&&worldQuests.definition().event==WorldQuestEvent::Seer){
+        const bool met=playerData_.get("metMoth")!=0;
+        if(!worldQuests.beginSeer(met,playerData_.get("ignoredMoth")!=0))return false;
+        if(!met&&!setPlayerData("metMoth",1)){worldQuests.cancelTalk();return false;}
+        return true;
+    }
+    if(talkingToTiso){
+        const bool encountered=playerData_.get("tisoEncounteredTown")!=0;
+        if(!tiso.beginTiso(encountered))return false;
+        if(!encountered&&!setPlayerData("tisoEncounteredTown",1)){tiso.cancelTalk();return false;}
+        return true;
+    }
     if(worldQuests.definition().event==WorldQuestEvent::Elderbug){
         const char* flag=nullptr;
         if(!worldQuests.beginElderbug(areaTitle.visitedCrossroads(),playerData_,flag))return false;
         if(flag&&!setPlayerData(flag,1)){worldQuests.cancelTalk();return false;}
         return true;
+    }
+    if(worldQuests.definition().event==WorldQuestEvent::Quirrel){
+        const auto* scene=sceneName();
+        const auto cityTalks=std::clamp<int32_t>(playerData_.get("quirrelRuins"),0,3);
+        if(!std::strcmp(scene,"Ruins1_02")&&cityTalks<3&&!setPlayerData("quirrelRuins",cityTalks+1))return false;
+        if(!std::strcmp(scene,"Fungus2_14")&&!setPlayerData("quirrelMantisEncountered",1))return false;
+        return worldQuests.beginQuirrel(unsigned(cityTalks));
     }
     return commitWorldQuest(worldQuests.definition().event,true);
 }
@@ -2131,6 +2183,10 @@ void TutorialSession::enterScene(const RoomConfig& rules,TerrainBank& terrain,co
     entryState.apply(simulation.hero);
     collectibles.restore(keep.collectibles,simulation.hero.vitals);
     resetWorldQuest();
+    if(worldQuests.present()&&worldQuests.definition().event==WorldQuestEvent::Quirrel){
+        if(!std::strcmp(sceneName(),"Fungus2_01"))setPlayerData("quirrelLeftStation",1);
+        else if(!std::strcmp(sceneName(),"Fungus3_47"))setPlayerData("quirrelArchiveEncountered",1);
+    }
     placeBenchRespawn();
     sceneWalls.enter(simulation.hero.position.x);
     // Entering a loaded room delivers the source HERO IN POSITION event.
@@ -2144,7 +2200,7 @@ void TutorialSession::enterScene(const RoomConfig& rules,TerrainBank& terrain,co
     }
     areaTitle.heroInPosition();
     enterAbilityPickup();
-    cartographer.progress.visitRoom(mapRoomIndex(scene));
+    cartographer.progress.visitRoom(savedMapRoomIndex(scene));
     cartographer.enter(scene,playerData_.get("openedMapperShop")!=0);
     resting.enterStation(rules.stag,!std::strcmp(gate,"stag"),simulation.hero,playerData_);
     if(!std::strncmp(gate,"bot",3))simulation.hero.velocity.y=40;
@@ -2311,6 +2367,7 @@ void TutorialSession::captureVisualAlphaInputs(const std::vector<unsigned>& owne
     const auto& quest=worldQuests.definition();
     if(worldQuests.hides(quest.owner))add(WorldQuests,quest.owner,0);
     for(unsigned i=0;i<quest.ownerCount;++i)if(worldQuests.hides(quest.owners[i]))add(WorldQuests,quest.owners[i],0);
+    if(tiso.hides(tiso.definition().owner))add(WorldQuests,tiso.definition().owner,0);
     if(!sceneActive_){
         if(flow.progress.collapsed)roomDynamics.visitCollapseOwners([&](unsigned owner){add(Collapse,owner,0);});
         if(floorBroken&&rules_)for(const auto owner:rules_->breakFloorOwners)add(Floor,owner,0);
@@ -2366,7 +2423,7 @@ float TutorialSession::visualAlpha(unsigned owner) const
     const float dreamAlpha=dreamPlatformAlpha(owner);
     if(dreamAlpha!=1)return dreamAlpha;
     if(sceneActive_&&sceneEnemies.hides(owner,crossroadsBoss))return 0;
-    if(collectibles.hides(owner)||worldQuests.hides(owner))return 0;
+    if(collectibles.hides(owner)||worldQuests.hides(owner)||tiso.hides(owner))return 0;
     // These banks stay resident from Tutorial; their owner IDs are scene local.
     if(!sceneActive_&&flow.progress.collapsed&&roomDynamics.collapseOwner(owner))return 0;
     if(!sceneActive_&&floorBroken&&rules_&&
@@ -2425,7 +2482,7 @@ ArrowPromptRequest TutorialSession::gameplayPrompt() const
     if(slyShop.open||routeTolls.menu.open||cityGate.menu.open||cartographer.locked()||conditionalEvents.dialogue!=EventDialogue::None||
        worldQuestDialogue.locked()||inspection.locked()||abilityPickup.locked()||resting.sitting||
        resting.travelMenu||resting.charmMenu)return {};
-    if(slyShop.prompt)return {"SHOP",at};
+    if(slyShop.prompt||(worldQuestDialogue.prompt&&worldQuests.lemmShopNearby(bodyBounds(simulation.hero.position))))return {"SHOP",at};
     if(cityGate.menu.prompt)return {"INSPECT",at};
     if(routeTolls.menu.prompt)return {"INSPECT",at};
     if(resting.prompt){

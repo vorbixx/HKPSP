@@ -1,16 +1,27 @@
 """Export only the Town/Crossroads map pieces and their authored pins."""
 import hashlib
 import json
+from pathlib import Path
+import argparse
 
 from assetripper_client import Client, ROOT
 from extract_crawler import Export
 
 
-def extract():
-    output = ROOT / '_private/research/bottom-map'
+REGIONS = (('Greenpath', 10282, 'Fungus1_'), ('Fungal Wastes', 10827, 'Fungus2_'),
+           ('Ancient Basin', 9831, 'Abyss_'), ('Deepnest', 9146, 'Deepnest_'))
+
+
+def extract(output=ROOT / '_private/research/bottom-map', port=58291, regional=False):
+    output = output.resolve()
+    if not output.is_relative_to(ROOT / '_private'):
+        raise ValueError('Map exports must stay in the worktree private directory')
     output.mkdir(parents=True, exist_ok=True)
-    client = Client()
+    client = Client(port)
     rows = client.search('Crossroads_') + client.search('Town') + client.search('Tutorial_01')
+    if regional:
+        for prefix in ('Fungus1_', 'Fungus2_', 'Abyss_', 'Deepnest_', 'Room_'):
+            rows.extend(client.search(prefix))
     collection = next(r['path']['C'] for r in rows if r['name'] == 'Crossroads_01' and
                       r['collection'] == 'resources.assets')
     sprites = {r['name']: r for r in rows if r['type'] == 'Sprite' and
@@ -36,13 +47,17 @@ def extract():
 
     rooms = []
     # Serialized Game Map area transforms, not the separate wide-map thumbnails.
-    for area, transform_id in (('Dirtmouth', 11112), ('Forgotten Crossroads', 9400)):
+    areas = tuple((area, ref) for area, ref, _ in REGIONS) if regional else (
+        ('Dirtmouth', 11112), ('Forgotten Crossroads', 9400))
+    for area, transform_id in areas:
         root, _ = export.fetch(collection, transform_id)
         for child in root['m_Children']:
             transform, _ = export.fetch(collection, child['m_PathID'])
             parts = export.components(collection, transform['m_GameObject']['m_PathID'])
             name = export.cache[parts['GameObject'][0]]['m_Name']
-            if 'SpriteRenderer' not in parts or not (name.startswith('Crossroads_') or name in ('Town', 'Tutorial_01')):
+            if 'SpriteRenderer' not in parts or name not in sprites:
+                continue
+            if not regional and not (name.startswith('Crossroads_') or name in ('Town', 'Tutorial_01')):
                 continue
             renderer = export.cache[parts['SpriteRenderer'][0]]
             full = sprites[name]
@@ -71,4 +86,10 @@ def extract():
 
 
 if __name__ == '__main__':
-    extract()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--port', type=int, default=58291)
+    parser.add_argument('--output', type=Path)
+    parser.add_argument('--regional', action='store_true')
+    args = parser.parse_args()
+    output = args.output or ROOT / ('_private/npc-regional-map' if args.regional else '_private/research/bottom-map')
+    extract(output, args.port, args.regional)

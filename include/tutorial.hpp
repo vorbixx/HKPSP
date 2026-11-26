@@ -226,6 +226,11 @@ public:
     bool shopMenuOpen() const {return slyShop.open||routeTolls.menu.open||cityGate.menu.open;}
     AnimationPlayer slyShopAnimation;
     WorldQuests worldQuests;
+    WorldQuests tiso;
+    bool talkingToTiso=false;
+    bool lemmShopSelected=false;
+    WorldQuests& dialogueQuest(){return talkingToTiso?tiso:worldQuests;}
+    const WorldQuests& dialogueQuest() const{return talkingToTiso?tiso:worldQuests;}
     WorldQuestDialogue worldQuestDialogue;
     // Diagnostic fixture uses the ordinary transition loader, without grants.
     bool testWorldQuestRoom() {

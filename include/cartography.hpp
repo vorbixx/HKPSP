@@ -8,11 +8,15 @@ struct CartographySave
 {
     static constexpr std::uint32_t MapCrossroads=1u,EncounteredCrossroads=2u,
         LeftCrossroads=4u,AtHome=8u,MetCornifer=16u,HasQuill=32u;
-    static constexpr std::uint32_t validFlags=63u;
+    static constexpr std::uint32_t regionalMaps=15u<<6;
+    static constexpr std::uint32_t validFlags=63u|regionalMaps;
     static constexpr unsigned roomCount=256;
     std::uint32_t flags=0;
     std::array<std::uint32_t,8> visited{},mapped{};
     bool ownsCrossroads() const{return (flags&MapCrossroads)!=0;}
+    bool ownsMap() const{return (flags&(MapCrossroads|regionalMaps))!=0;}
+    bool ownsArea(unsigned area) const
+    {return area==1?ownsCrossroads():area>=2&&area<=5&&(flags&(1u<<(area+4)))!=0;}
     bool quill() const{return (flags&HasQuill)!=0;}
     bool visitedRoom(unsigned room) const{return room<roomCount&&(visited[room/32]&(1u<<(room%32)))!=0;}
     bool mappedRoom(unsigned room) const{return room<roomCount&&(mapped[room/32]&(1u<<(room%32)))!=0;}
@@ -26,7 +30,7 @@ struct CartographySave
     }
     bool mapVisited()
     {
-        if(!ownsCrossroads()||!quill())return false;
+        if(!ownsMap()||!quill())return false;
         bool changed=false;
         for(unsigned i=0;i<visited.size();++i){changed|=(visited[i]&~mapped[i])!=0;mapped[i]|=visited[i];}
         return changed;

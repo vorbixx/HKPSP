@@ -581,6 +581,7 @@ static GameRunResult runGameSession(Platform& platform,unsigned frames,MenuRunti
     // Always resident: the selection wings of the Yes/No boxes live on this page in test mode too.
     textures.push_back(readTexture(platform.path("menu-fill.hpt")));
     MapAtlas mapAtlas(platform,textures);
+    MapAtlas regionalMapAtlas(platform,textures,"map-regions.hpt");
     MapOverlay map;
     const unsigned retainedPages=unsigned(textures.size());
     unsigned lanternGlowPage=0;
@@ -604,6 +605,7 @@ static GameRunResult runGameSession(Platform& platform,unsigned frames,MenuRunti
     bool worldActorsAdmitted=false;
     CorniferArt corniferArt;
     WorldQuestArt worldQuestArt;
+    WorldQuestArt tisoArt;
     RouteTollArt routeTollArt;
     SlyShopArt slyShopArt;
     hk3ds::WorldSwitchRoomAssets switchAssets;
@@ -697,6 +699,7 @@ static GameRunResult runGameSession(Platform& platform,unsigned frames,MenuRunti
         game.worldSwitch.clear();game.townLift.clear();
         corniferArt.clear(game.cartographer);
         worldQuestArt.clear(game.worldQuests);
+        tisoArt.clear(game.tiso);game.tiso.bind({});
         routeTollArt.clear(game.routeTolls);
         slyShopArt.clear(game);
         bossArt.clear(game);
@@ -789,13 +792,16 @@ static GameRunResult runGameSession(Platform& platform,unsigned frames,MenuRunti
             game.setSceneAmbient(true);
         }else{
             game.worldQuests.loadScene(root.c_str(),gate.scene);
-            if(!std::strcmp(gate.scene,"Crossroads_33"))corniferArt.load(platform,textures,game.cartographer);
+            if(!std::strcmp(gate.scene,"Town")&&!game.tiso.load(platform.path("tiso.bin").c_str()))
+                throw std::runtime_error("Town Tiso table missing or invalid");
+            if(hk3ds::Cartographer::hasPlacement(gate.scene))corniferArt.load(platform,textures,game.cartographer);
             game.enterScene(activeScene.rules,terrain,gate.scene,gate.entry);
             if(game.areaTitle.originalRegionLayout())
                 regionTitleArt=animationPages.load(platform,textures,"region-title.bin","region-title");
             // main.cpp:1865-1875: the quest art is bound only while the source room holds the NPC. Load it after
             // the scene entry (WorldQuests::enter sets presence); a present quest without a bound bank throws.
             worldQuestArt.load(platform,textures,game.worldQuests);worldQuestArt.require(game.worldQuests);
+            tisoArt.load(platform,textures,game.tiso);tisoArt.require(game.tiso);
             if(!std::strcmp(gate.scene,"Room_shop"))slyShopArt.load(platform,textures,game);
             if(!std::strcmp(gate.scene,"Room_mapper"))slyShopArt.loadOrnaments(platform,textures);
             game.sceneWalls.bindVisuals(room);
@@ -1185,7 +1191,7 @@ static GameRunResult runGameSession(Platform& platform,unsigned frames,MenuRunti
             }
         }
         bool quitToTitle=false;
-        std::size_t mapRoom=hk3ds::mapdata::roomCount;
+        std::size_t mapRoom=hk3ds::savedMapRoomCount;
         if(menus){
             const auto ui=menus->pollUi(platform);
             const bool wasPaused=map.pauses();
@@ -1197,11 +1203,11 @@ static GameRunResult runGameSession(Platform& platform,unsigned frames,MenuRunti
             if(action==MenuState::Action::SettingsChanged){
                 menus->saveSettings();applyMenuVolumes();
             }
-            if(ui.selectHoldPressed||map.showsMap()||wasPaused)mapRoom=hk3ds::mapRoomIndex(game.sceneName());
+            if(ui.selectHoldPressed||map.showsMap()||wasPaused)mapRoom=hk3ds::savedMapRoomIndex(game.sceneName());
             map.update(ui,menus->state.simulate()&&!game.flow.transition&&!game.shopMenuOpen()&&
                 !game.cartographer.locked()&&!game.worldQuestDialogue.locked(),
-                game.cartographer.progress.ownsCrossroads(),
-                mapRoom<hk3ds::mapdata::roomCount&&hk3ds::mapdata::rooms[mapRoom].area==1);
+                game.cartographer.progress.ownsMap(),mapRoom<hk3ds::savedMapRoomCount&&
+                game.cartographer.progress.ownsArea(hk3ds::savedMapRoom(mapRoom).area));
             // Charms page: d-pad/nub move the grid (CharmsPage, as the 3DS Charms tab); Cross is Jump
             // and Circle (menu confirm, docs/psp/controls.md) toggles the selected charm. toggleCharm refuses
             // unless the player rests at a bench.
@@ -1213,6 +1219,9 @@ static GameRunResult runGameSession(Platform& platform,unsigned frames,MenuRunti
                 if(ui.pressed&UiCircle)game.toggleCharm();
             }
             mapAtlas.setVisible(platform,textures,map.showsMap());
+            regionalMapAtlas.setVisible(platform,textures,map.showsMap()&&
+                (game.cartographer.progress.flags&hk3ds::CartographySave::regionalMaps)&&
+                (map.view()!=MapView::Quick||mapRoom>=hk3ds::mapdata::roomCount));
             if(!menus->state.simulate()||map.pauses()||wasPaused){
                 menus->guard.block(platform.poll().held);input.sample(0,0,0);
             }
@@ -1317,7 +1326,8 @@ static GameRunResult runGameSession(Platform& platform,unsigned frames,MenuRunti
         game.monomon.capture(monomonDraw);
         // main.cpp:462-628,724-729: actors in the original pass positions.
         HKPSP_GPU_PASS(list,Actors,(appendDoor(list,*actorArt,game,camera),appendGeo(list,*actorArt,game,camera),
-            corniferArt.append(list,game.cartographer,camera),worldQuestArt.append(list,game.worldQuests,camera),routeTollArt.append(list,game.routeTolls,camera),
+            corniferArt.append(list,game.cartographer,camera),worldQuestArt.append(list,game.worldQuests,camera),
+            tisoArt.append(list,game.tiso,camera),routeTollArt.append(list,game.routeTolls,camera),
             slyShopArt.append(list,game,camera),
             appendFury(list,*actorArt,game,camera,false),appendCrawlers(list,*actorArt,game,camera,enemySurvey.get()),
             appendShade(list,*actorArt,game,camera),appendBuzzers(list,*actorArt,game,camera,enemySurvey.get()),
@@ -1385,11 +1395,11 @@ static GameRunResult runGameSession(Platform& platform,unsigned frames,MenuRunti
         HKPSP_GPU_PASS(list,Hud,monomonArt.overlay(textCanvas,monomonDraw));
         if(map.showsMap()){
             const bool compass=game.charmInventory.wears(2);
-            const auto hero=compass&&mapRoom<hk3ds::mapdata::roomCount?
-                hk3ds::mapHeroPosition(hk3ds::mapdata::rooms[mapRoom],hk3ds::collisionMapBounds(terrain.world()),
+            const auto hero=compass&&mapRoom<hk3ds::savedMapRoomCount?
+                hk3ds::mapHeroPosition(hk3ds::savedMapRoom(mapRoom),hk3ds::collisionMapBounds(terrain.world()),
                     game.simulation.hero.position):hk3ds::Vec2{};
             HKPSP_GPU_PASS(list,Hud,appendMap(list,textCanvas.canvas(),mapAtlas.page(),map.view(),
-                game.cartographer.progress,mapRoom,hero,compass,map.pan()));
+                game.cartographer.progress,mapRoom,hero,compass,map.pan(),regionalMapAtlas.page()));
         }else if(map.view()==MapView::Items||map.view()==MapView::Charms||inventoryPreview!=InventoryPreview::Off){
             const auto& hero=game.simulation.hero;
             const hk3ds::InventorySnapshot inventory{hero.vitals,hero.abilities,game.geo,

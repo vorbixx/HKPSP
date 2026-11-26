@@ -22,10 +22,10 @@ class MapAtlas {
     bool loaded_=false;
     static Texture descriptor();
 public:
-    MapAtlas(Platform&,std::vector<Texture>&);
+    MapAtlas(Platform&,std::vector<Texture>&,const char* asset="map-page-0.hpt");
     unsigned page()const{return page_;}
     void setVisible(Platform&,std::vector<Texture>&,bool);
 };
 void appendMap(DrawList&,hk3ds::ui::Canvas,unsigned page,MapView,const hk3ds::CartographySave&,
-               std::size_t current,hk3ds::Vec2 hero,bool compass,hk3ds::Vec2 pan={});
+               std::size_t current,hk3ds::Vec2 hero,bool compass,hk3ds::Vec2 pan={},unsigned regionalPage=0);
 }

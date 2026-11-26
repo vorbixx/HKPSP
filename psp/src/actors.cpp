@@ -364,6 +364,15 @@ void appendSpirits(DrawList& list,const hk3ds::AnimationBank& bank,unsigned page
                    const hk3ds::TutorialSession& g,hk3ds::Vec2 camera){
     const auto time=g.presentationTime();
     for(const auto& spirit:g.simulation.spirits.actors)appendSpiritProjectile(list,bank,page,spirit,time,camera);
+    // Snail Shaman beside the Vengeful Spirit pickup (Shaman Meeting transform).
+    const auto& pickup=g.abilityPickup;
+    if(pickup.kind==hk3ds::AbilityPickup::Kind::Spirit&&pickup.available){
+        if(const auto* clip=bank.find("Shaman Idle")){
+            hk3ds::AnimationPlayer player;player.play(clip);player.advance(pickup.seconds);
+            ActorPose pose;pose.position=pickup.position;pose.depth=.01f;
+            appendActor(list,bank,player,pose,camera,page);
+        }
+    }
 }
 void appendDecor(hk3ds::TutorialSession& g){
     // main.cpp:2093-2097. These RoomDraw transforms join the existing room merge.

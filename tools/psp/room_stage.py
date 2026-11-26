@@ -371,6 +371,9 @@ def complete_trace(trace: Path, source: Path, assets: Path, stage: Path, output:
     root = source / "_private/converted/hero/romfs"
     scenes, _, _ = selected_rooms(source, stage, legs, assets)
     scenes = list(dict.fromkeys([*scenes, *explicit_rooms(source, rooms, assets)]))
+    if scenes:
+        for name in ('map-page-0.hpt', 'map-regions.hpt'):
+            add(name, assets / 'map' / name)
     if any(scene in scenes for scene in ('RestingGrounds_04', 'Dream_Nailcollection')):
         add('dream-dialogue.bin', stage_dream_dialogue(source, output.parent / 'dream-dialogue.bin'))
     if any(scene in scenes for scene in ('Town', 'Crossroads_01', 'Fungus1_01')):
@@ -413,13 +416,14 @@ def complete_trace(trace: Path, source: Path, assets: Path, stage: Path, output:
                 leaves += ('city-toll.bin',)
             for leaf in leaves:
                 add(f'scenes/{scene}/{leaf}', root / 'scenes' / scene / leaf)
-        if scene == 'Crossroads_33':
-            cornifer = package / 'cornifer-visual.bin'
+        if scene in ('Crossroads_33', 'Fungus1_06', 'Fungus2_18', 'Abyss_04', 'Fungus2_25'):
+            cornifer_package = assets / 'Crossroads_33'
+            cornifer = cornifer_package / 'cornifer-visual.bin'
             with cornifer.open('rb') as stream:
                 if stream.read(16) != struct.pack('<4s3I', b'PSA1', 1, 512, 1):
                     raise ValueError('Invalid PSP Cornifer table')
             for leaf in ('cornifer-visual.bin', 'cornifer-page-0.hpt'):
-                add(f'rooms/{scene}/{leaf}', package / leaf)
+                add(f'rooms/Crossroads_33/{leaf}', cornifer_package / leaf)
         if scene == 'Room_ruinhouse':
             # Sly world quest: PSA1 art (anim-libraries) and the source quest definition
             # (main.cpp:1865-1875, src/world_quests.cpp loadScene). Rooms namespace per scene.
@@ -443,14 +447,28 @@ def complete_trace(trace: Path, source: Path, assets: Path, stage: Path, output:
             add(f'rooms/{scene}/bretta-quest-page-0.hpt', library / 'page-0.hpt')
             add('bretta-quest.bin', root / 'bretta-quest.bin')
         if scene == 'Town':
-            library = assets / 'elderbug'
-            art = library / 'elderbug-visual.bin'
+            for npc in ('elderbug', 'tiso'):
+                library = assets / npc
+                art = library / f'{npc}-visual.bin'
+                with art.open('rb') as stream:
+                    if stream.read(16) != struct.pack('<4s3I', b'PSA1', 1, 512, 1):
+                        raise ValueError(f'Invalid PSP {npc} table')
+                add(f'rooms/{scene}/{npc}-visual.bin', art)
+                add(f'rooms/{scene}/{npc}-page-0.hpt', library / 'page-0.hpt')
+                add(f'{npc}.bin', library / f'{npc}.bin')
+        if scene in ('Fungus2_01', 'Fungus2_14', 'Ruins1_02', 'Fungus3_47'):
+            library = assets / 'quirrel' / scene
+            art = library / 'quirrel-visual.bin'
             with art.open('rb') as stream:
                 if stream.read(16) != struct.pack('<4s3I', b'PSA1', 1, 512, 1):
-                    raise ValueError('Invalid PSP Elderbug table')
-            add(f'rooms/{scene}/elderbug-visual.bin', art)
-            add(f'rooms/{scene}/elderbug-page-0.hpt', library / 'page-0.hpt')
-            add('elderbug.bin', library / 'elderbug.bin')
+                    raise ValueError('Invalid PSP Quirrel table')
+            for name in ('quirrel.bin', 'quirrel-visual.bin', 'quirrel-page-0.hpt'):
+                add(f'rooms/{scene}/{name}', library / ('page-0.hpt' if name.endswith('.hpt') else name))
+        if scene in ('RestingGrounds_07', 'Ruins1_05b'):
+            prefix = 'seer' if scene == 'RestingGrounds_07' else 'lemm'
+            library = assets / prefix
+            for suffix in ('.bin', '-visual.bin', '-page-0.hpt'):
+                add(f'rooms/{scene}/{prefix}{suffix}', library / ('page-0.hpt' if suffix.endswith('.hpt') else prefix + suffix))
         if scene == 'Crossroads_10':
             # False Knight boss art: PSA1 table of 11 pages (anim-libraries), the
             # 3DS romfs false-knight-art.bin/page-N bank (main.cpp:1926-1934) in PSP form.

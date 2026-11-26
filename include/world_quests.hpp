@@ -6,11 +6,13 @@ namespace hk3ds {
 struct SavedPlayerData;
 // Typed hand-off to regional NPC scripts and the Dirtmouth shop owner.
 // Boss combat and Dreamer/seal events belong to their respective owners.
-enum class WorldQuestEvent : unsigned { SlyRescued=1, BrettaRescued=2, Elderbug=3 };
+enum class WorldQuestEvent : unsigned { SlyRescued=1, BrettaRescued=2, Elderbug=3, Tiso=4, Quirrel=5, Seer=6, Lemm=7 };
 enum class WorldQuestTalk : unsigned { None, Rescue1, Rescue2, Rescue3, Repeat, Rescue4,
     IntroNormal, IntroWalkedBy, IntroVisitedCrossroads, IntroMain, ElderbugGeneric,
     BlackEgg, Infected, Sly, Station, Temple, MapShop, Bretta, Jiji, Cliffs, MinesLift,
-    History1, History2, HintRestingGrounds, HintBasin, HintMines, HintCity, HintFungus, HintGreenpath };
+    History1, History2, HintRestingGrounds, HintBasin, HintMines, HintCity, HintFungus, HintGreenpath,
+    SeerMeetA, SeerMeetB, SeerIntro, SeerIntroEnd, SeerGreet, SeerQuest, SeerPlant, SeerXero, SeerGeneric,
+    LemmIntro, LemmConvo1, LemmConvo2, LemmConvo3, LemmRepeat, LemmDung, LemmNailsmith, LemmNoRelics };
 // Presentation hand-off: opened follows Box Up; finished means CONVO_FINISH.
 enum class WorldQuestInteraction : unsigned { DialogueOpened, ConversationFinished, Cancel };
 struct WorldQuestDefinition {
@@ -21,6 +23,7 @@ struct WorldQuestDefinition {
     Vec2 position{},scale{1,1};
     unsigned ownerCount=0;
     std::array<unsigned,16> owners{};
+    Rect shopRange{};
 };
 class WorldQuests {
     friend struct SimulationStateHash;
@@ -42,8 +45,13 @@ public:
     // The NPC presentation calls beginTalk after its source Box Up state.
     bool beginTalk(Collectibles&);
     bool beginElderbug(bool visitedCrossroads,const SavedPlayerData&,const char*& flag);
+    bool beginTiso(bool encountered);
+    bool beginQuirrel(unsigned cityTalks);
+    bool beginSeer(bool met,bool ignored);
+    bool beginLemm(bool shop,const SavedPlayerData&,bool dung,bool superDash,const char*& flag);
+    bool lemmShopNearby(Rect hero) const;
     bool elderbugWalkedBy(Rect hero,bool visitedCrossroads,const SavedPlayerData&) const;
-    bool finishDialogue();
+    bool finishDialogue(bool plantComplete=false,bool xeroDefeated=false);
     void cancelTalk();
     float titleAlpha() const;
     WorldQuestTalk talk() const {return talk_;}
@@ -62,8 +70,10 @@ public:
 private:
     WorldQuestDefinition definition_{};
     std::array<std::array<char,768>,5> dialogues_{};
-    std::vector<std::array<char,768>> elderbugDialogues_;
+    std::vector<std::array<char,768>> extendedDialogues_;
     bool elderbugHintGiven_=false;
+    bool seerGreeted_=false;
+    unsigned quirrelTalks_=0;
     unsigned dialogueIndex() const;
     const char* animationClip(const char* phase) const;
     WorldQuestTalk talk_=WorldQuestTalk::None;

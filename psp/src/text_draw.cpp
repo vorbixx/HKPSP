@@ -68,13 +68,18 @@ TextCanvas::TextCanvas(DrawList& target,const FontBank& source,unsigned firstPag
     }
     throw std::runtime_error("Font atlas lacks an opaque white fill texel");
 }
+static float textKerning(const FontBank& fonts,unsigned font,unsigned left,unsigned right){
+    if(!left||(font==0&&(left==' '||right==' ')))return 0.f;
+    const auto adjustment=fonts.kern(font,left,right);
+    return font==0&&left=='g'&&right=='.'?std::max(0.f,adjustment):adjustment;
+}
 float TextCanvas::measure(const char* value,hk3ds::ui::Size size)const{
     // Every text sink accepts "@key" text from the text pack.
     value=hk3ds::text::resolve(value);
     if(!value)return 0;
     const unsigned f=font(size);float width=0;unsigned previous=0;
     for(auto p=value;*p;){const auto cp=next(p);
-        if(previous)width+=fonts.kern(f,previous,cp);
+        width+=textKerning(fonts,f,previous,cp);
         width+=fonts.glyph(f,cp).advance;previous=cp;
     }
     return width;
@@ -85,7 +90,7 @@ void TextCanvas::text(const char* value,float x,float y,hk3ds::ui::Size size,std
     const auto f=font(size);const float baseline=y+hk3ds::ui::baselineOffset(size);
     unsigned previous=0;
     for(auto p=value;*p;){const auto cp=next(p);const auto& g=fonts.glyph(f,cp);
-        if(previous)x+=fonts.kern(f,previous,cp);
+        x+=textKerning(fonts,f,previous,cp);
         if(g.width&&g.height){
             const float px=std::round(x+g.bearingX),py=std::round(baseline+g.bearingY);
             Quad q;q.page=fontPage+g.page;q.u0=float(g.x);q.v0=float(g.y);
@@ -267,7 +272,7 @@ void TextCanvas::cartographer(const hk3ds::Cartographer& npc,unsigned geo,const 
     if(!npc.locked()||(npc.shop&&npc.dialogue==hk3ds::Cartographer::Dialogue::Prompt))return;
     if(npc.dialogue==hk3ds::Cartographer::Dialogue::Prompt){
         // ui-compare yes-no-map: the original shows "Not enough Geo." under the choices when unaffordable.
-        const unsigned price=hk3ds::CartographySave::cornifierPrice;
+        const unsigned price=npc.price();
         choiceBox(npc.text(),price,npc.yes,actors,nullptr,geo>=price);
         return;
     }
@@ -507,9 +512,12 @@ void TextCanvas::focus(const hk3ds::TutorialPrompts& prompts){
     line("to focus your SOUL and HEAL.",232,hk3ds::ui::Size::Body);
 }
 static bool questDialogueBoxOpen(const hk3ds::TutorialSession& game){
+    const auto event=game.dialogueQuest().definition().event;
     return game.worldQuestDialogue.visible()&&
            (game.cityCrest.controlsHero()||
-            (game.worldQuests.present()&&game.worldQuests.definition().event==hk3ds::WorldQuestEvent::Elderbug));
+            (game.dialogueQuest().present()&&(game.talkingToTiso||
+             event==hk3ds::WorldQuestEvent::Elderbug||event==hk3ds::WorldQuestEvent::Quirrel||
+             event==hk3ds::WorldQuestEvent::Seer||event==hk3ds::WorldQuestEvent::Lemm)));
 }
 bool dialogueBoxOpen(const hk3ds::TutorialSession& game){
     // Same gates as appendText's dialogue, cartographer (Cornifer, purchase prompt included) and Hornet intro draws.

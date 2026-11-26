@@ -42,8 +42,8 @@ Texture MapAtlas::descriptor(){
     Texture texture;texture.width=texture.height=512;texture.transient=true;
     return texture;
 }
-MapAtlas::MapAtlas(Platform& platform,std::vector<Texture>& textures)
-    :path_(platform.path("map-page-0.hpt")),page_(unsigned(textures.size())){
+MapAtlas::MapAtlas(Platform& platform,std::vector<Texture>& textures,const char* asset)
+    :path_(platform.path(asset)),page_(unsigned(textures.size())){
     textures.push_back(descriptor());
 }
 void MapAtlas::setVisible(Platform& platform,std::vector<Texture>& textures,bool visible){
@@ -51,7 +51,7 @@ void MapAtlas::setVisible(Platform& platform,std::vector<Texture>& textures,bool
     if(visible){
         auto texture=readTexture(path_);
         if(texture.width!=512||texture.height!=512||texture.bits!=8||texture.cluts)
-            throw std::runtime_error("Crossroads map atlas contract failed");
+            throw std::runtime_error("Map atlas contract failed: "+path_);
         texture.transient=true;
         textures.at(page_)=std::move(texture);
     }else{
@@ -63,18 +63,23 @@ void MapAtlas::setVisible(Platform& platform,std::vector<Texture>& textures,bool
 
 void appendMap(DrawList& list,hk3ds::ui::Canvas canvas,unsigned page,MapView view,
                const hk3ds::CartographySave& progress,std::size_t current,hk3ds::Vec2 hero,bool compass,
-               hk3ds::Vec2 pan){
+               hk3ds::Vec2 pan,unsigned regionalPage){
     using namespace hk3ds;
     using namespace hk3ds::ui;
-    if(!progress.ownsCrossroads()||view==MapView::Closed||view==MapView::Items||view==MapView::Charms)return;
+    if(!progress.ownsMap()||view==MapView::Closed||view==MapView::Items||view==MapView::Charms)return;
     const bool quick=view==MapView::Quick;
     const bool overview=view==MapView::Inventory;
     const bool zoomed=view==MapView::InventoryZoom;
+    const auto currentArea=current<savedMapRoomCount?savedMapRoom(current).area:0u;
+    const bool regional=quick&&currentArea>=2;
+    Vec2 origin{.3f,5.25f};
+    if(regional)origin={savedMapRoom(current).x,savedMapRoom(current).y};
+    else if(!quick&&(progress.flags&CartographySave::regionalMaps))origin={-2.f,-1.f};
     const float scale=overview?7.3f:20.f;
     const float centerY=overview?146.f:(quick?138.f:147.f);
     const auto shift=zoomed?Vec2{pan.x*panPixels,-pan.y*panPixels}:Vec2{};
     const auto project=[&](Vec2 point){
-        return Vec2{240.f+(point.x-.3f)*scale+shift.x,centerY-(point.y-5.25f)*scale+shift.y};
+        return Vec2{240.f+(point.x-origin.x)*scale+shift.x,centerY-(point.y-origin.y)*scale+shift.y};
     };
     const auto widget=[&](Widget art,float centerX,float centerY){
         const float left=centerX-art.width*.5f,top=centerY-art.height*.5f;
@@ -85,27 +90,27 @@ void appendMap(DrawList& list,hk3ds::ui::Canvas canvas,unsigned page,MapView vie
         quad.positions={{{left,top},{right,top},{right,bottom},{left,bottom}}};
         list.quads.push_back(quad);
     };
-    const auto image=[&](unsigned index,Vec2 center,float density,std::array<float,4> color){
-        const auto& art=mapdata::images[index];
+    const auto image=[&](const mapdata::Image& art,Vec2 center,float density,std::array<float,4> color,unsigned atlas){
         const float left=center.x+art.left*density,top=center.y-art.top*density;
         const float right=center.x+art.right*density,bottom=center.y-art.bottom*density;
-        Quad quad;quad.page=page;quad.rgba=color;
+        Quad quad;quad.page=atlas;quad.rgba=color;
         quad.u0=float(art.x);quad.v0=float(art.y);
         quad.u1=float(art.x+art.w);quad.v1=float(art.y+art.h);
         quad.positions={{{left,top},{right,top},{right,bottom},{left,bottom}}};
         list.quads.push_back(quad);
     };
-    for(std::size_t index=0;index<mapdata::roomCount;++index){
-        const auto& room=mapdata::rooms[index];
-        const bool context=!overview&&room.area==0&&(!quick||room.rough!=~0u);
-        const bool crossroads=room.area==1&&(room.rough!=~0u||progress.visitedRoom(unsigned(index)));
-        if(!context&&!crossroads)continue;
+    for(std::size_t index=0;index<savedMapRoomCount;++index){
+        const auto& room=savedMapRoom(index);
+        const bool context=!regional&&progress.ownsCrossroads()&&!overview&&room.area==0&&(!quick||room.rough!=~0u);
+        const bool owned=progress.ownsArea(room.area)&&(!quick||room.area==(regional?currentArea:1u))&&
+            (room.rough!=~0u||progress.mappedRoom(unsigned(index))||(room.area==1&&progress.visitedRoom(unsigned(index))));
+        if(!context&&!owned)continue;
         const auto art=context&&room.rough!=~0u?room.rough:mapInkImage(progress,room,index);
-        image(art,project({room.x,room.y}),scale,
-              {room.r/255.f,room.g/255.f,room.b/255.f,room.a/255.f});
+        image(room.area>=2?regionalmap::images[art]:mapdata::images[art],project({room.x,room.y}),scale,
+              {room.r/255.f,room.g/255.f,room.b/255.f,room.a/255.f},room.area>=2?regionalPage:page);
     }
-    if(compass&&current<mapdata::roomCount&&mapdata::rooms[current].area==1&&progress.visitedRoom(unsigned(current)))
-        image(mapdata::marker,project(hero),overview?10.f:11.f,{1.f,1.f,1.f,1.f});
+    if(compass&&progress.ownsArea(currentArea)&&progress.visitedRoom(unsigned(current)))
+        image(mapdata::images[mapdata::marker],project(hero),overview?10.f:11.f,{1.f,1.f,1.f,1.f},page);
     if(zoomed){
         if(pan.y>panMinY)widget(arrowUp,239,52);
         if(pan.y<panMaxY)widget(arrowDown,240,229);
@@ -114,21 +119,25 @@ void appendMap(DrawList& list,hk3ds::ui::Canvas canvas,unsigned page,MapView vie
     }
     if(canvas.text){
         if(!quick){
-            wrappedText(canvas,"Forgotten\nCrossroads",overview?ui::Rect{238,134,90,40}:
+            if(progress.ownsCrossroads()&&!(progress.flags&CartographySave::regionalMaps))
+                wrappedText(canvas,"Forgotten\nCrossroads",overview?ui::Rect{238,134,90,40}:
                         ui::Rect{254+shift.x,182+shift.y,90,40},Size::Body);
             const char* zoom=overview?"Zoom In  (Circle)":"Zoom Out  (Cross)";
             const float width=canvas.measure(canvas.user,zoom,Size::Body);
             widget(zoomBoard,408,225);
             canvas.text(canvas.user,zoom,408.f-width*.5f,215.f,Size::Body,white);
         }else{
-            const char* title="Forgotten Crossroads";
+            constexpr const char* titles[]={"", "Forgotten Crossroads", "Greenpath", "Fungal Wastes", "Ancient Basin", "Deepnest"};
+            const char* title=titles[regional?currentArea:1];
             const Size size=Size::Body;
             const float width=canvas.measure(canvas.user,title,size);
             widget(titleBoard,240,26);
             canvas.text(canvas.user,title,(480.f-width)*.5f,16.f,size,white);
         }
-        if(!overview)canvas.text(canvas.user,"Dirtmouth",178+shift.x,(quick?77.f:78.f)+shift.y,Size::Body,white);
-        if(zoomed)canvas.text(canvas.user,"King's Pass",103+shift.x,82+shift.y,Size::Body,white);
+        if(!overview&&!regional&&progress.ownsCrossroads()&&(quick||!(progress.flags&CartographySave::regionalMaps)))
+            canvas.text(canvas.user,"Dirtmouth",178+shift.x,(quick?77.f:78.f)+shift.y,Size::Body,white);
+        if(zoomed&&progress.ownsCrossroads()&&!(progress.flags&CartographySave::regionalMaps))
+            canvas.text(canvas.user,"King's Pass",103+shift.x,82+shift.y,Size::Body,white);
     }
 }
 }

@@ -38,11 +38,12 @@ def reflow(value, advances):
                 yield text
 
 
-def write_dialogue(original, source_root, output, transform):
+def write_dialogue(original, source_root, output, transform, npc='elderbug'):
+    tiso = npc == 'tiso'
     resources = Asset(original.source/'resources.assets')
     if resources.sha256 != RESOURCES_SHA:
         raise ValueError('Unexpected original Elderbug language source')
-    _, encoded = language_asset(resources.objects, 'EN_Elderbug')
+    _, encoded = language_asset(resources.objects, 'EN_Minor NPC' if tiso else 'EN_Elderbug')
     entries = {entry.attrib['name']: entry.text for entry in ET.fromstring(decrypt_language(encoded))}
     font = json.loads((source_root/'_private/research/tutorial-reminders/prompt-map.json').read_text())['fonts']['sharedassets0.assets-194.json']
     advances = {glyph['id']: glyph['xAdvance']*16/font['m_fontInfo']['PointSize'] for glyph in font['m_glyphInfoList']}
@@ -52,38 +53,47 @@ def write_dialogue(original, source_root, output, transform):
             'TEMPLE_VISITED', 'MAP_SHOP_OPEN', 'BRETTA_RETURNED', 'JIJI_DOOR', 'KINGS_PASS', 'MINES_LIFT',
             'HISTORY_1', 'HISTORY_2', 'HINT_RESTING_GROUNDS', 'HINT_ANCIENT_BASIN', 'HINT_CRYSTAL_PEAK',
             'HINT_CITY_OF_TEARS', 'HINT_FUNGAL_WASTES', 'HINT_GREENPATH')
-    texts = ['<page>'.join(reflow(entries['ELDERBUG_'+key], advances)).encode('ascii')
+    if tiso:
+        keys = ('TOWN_GREET', 'TOWN_REPEAT')
+    texts = ['<page>'.join(reflow(entries[npc.upper()+'_'+key], advances)).encode('ascii')
              for key in keys]
     if any(not text or len(text) >= 768 or b'\0' in text for text in texts):
         raise ValueError('Elderbug dialogue exceeds bounded storage')
-    collider = original.load('level7').objects[2586].read_typetree()
-    if collider['m_GameObject']['m_PathID'] != 1001 or not collider['m_IsTrigger']:
+    owner, transform_id, collider_id = (155, 1341, 2503) if tiso else (1001, 2188, 2586)
+    collider = original.load('level7').objects[collider_id].read_typetree()
+    if collider['m_GameObject']['m_PathID'] != owner or not collider['m_IsTrigger']:
         raise ValueError('Unexpected Elderbug trigger or transform')
     scene = Asset(original.source/'level7')
-    position = scene.point(2188, (0, 0))
+    position = scene.point(transform_id, (0, 0))
     scale = transform['m_LocalScale']
-    points = [scene.point(2188, (collider['m_Offset']['x']+x*collider['m_Size']['x']/2,
+    points = [scene.point(transform_id, (collider['m_Offset']['x']+x*collider['m_Size']['x']/2,
                                 collider['m_Offset']['y']+y*collider['m_Size']['y']/2))
               for x in (-1, 1) for y in (-1, 1)]
     bounds = [min(p[0] for p in points), min(p[1] for p in points),
               max(p[0] for p in points), max(p[1] for p in points)]
-    data = struct.pack('<4sIII32s8fII', b'WQ04', 3, 7001001, 1001, b'Town', *bounds,
-                       *position, scale['x'], scale['y'], 1, 1001)
+    data = struct.pack('<4sIII32s8fII', b'WQ05' if tiso else b'WQ04', 4 if tiso else 3,
+                       7000000+owner, owner, b'Town', *bounds, *position, scale['x'], scale['y'], 1, owner)
     data += b''.join(struct.pack('<I', len(text))+text for text in texts)
-    (output/'elderbug.bin').write_bytes(data)
+    (output/f'{npc}.bin').write_bytes(data)
 
 
-def convert(source_root, output):
+def convert(source_root, output, npc='elderbug'):
     original = Original(source_root)
     scene = original.load('level7')
-    animator = scene.objects[3820].read_typetree()
-    transform = scene.objects[2188].read_typetree()
-    if any(part['m_GameObject']['m_PathID'] != 1001 for part in (animator, transform)):
+    owner, animator_id, transform_id = (155, 3810, 1341) if npc == 'tiso' else (1001, 3820, 2188)
+    animator = scene.objects[animator_id].read_typetree()
+    transform = scene.objects[transform_id].read_typetree()
+    if any(part['m_GameObject']['m_PathID'] != owner for part in (animator, transform)):
         raise ValueError('Unexpected Town Elderbug owner')
     library = original.resolve(scene, animator['library'])
     idle = library.read_typetree()['clips'][animator['defaultClipId']]
     if 'idle' not in idle['name'].lower() or not idle['frames']:
         raise ValueError(f'Unexpected Elderbug default clip: {idle["name"]}')
+    write_idle(original, output, npc, library, idle, transform['m_LocalScale'])
+    write_dialogue(original, source_root, output, transform, npc)
+
+
+def write_idle(original, output, npc, library, idle, scale):
     sprites = {}
     keys = []
     for frame in idle['frames']:
@@ -98,7 +108,6 @@ def convert(source_root, output):
     source_pages = {index: image.new('RGBA', (2048, 2048)) for index in range(count)}
     records = []
     factors = []
-    scale = transform['m_LocalScale']
     density = room.room_focal_length(480, 272) / 38.1
     for (sprite, geometry), (page, left, top) in zip(sprites.values(), places):
         room.paste_padded(source_pages[page], sprite, left, top)
@@ -110,13 +119,12 @@ def convert(source_root, output):
     _, pages, _, geometry = room.build_pages(image, output, '', 0, records, factors,
                                             output, extra_pages=source_pages)
     if pages != 1:
-        raise ValueError(f'Elderbug idle exceeds the one-page budget: {pages}')
-    clips, frames, events = write_bank([('Elderbug Idle', idle, keys)], sprites, pages)
+        raise ValueError(f'{npc} idle exceeds the one-page budget: {pages}')
+    clips, frames, events = write_bank([(f'{npc.title()} Idle', idle, keys)], sprites, pages)
     table = (struct.pack('<4s6I', b'PSA1', 1, room.PAGE, pages, len(sprites), 1, len(frames))
              + geometry + clips + struct.pack(f'<{len(frames)}I', *frames) + events)
-    (output/'elderbug-visual.bin').write_bytes(table)
-    write_dialogue(original, source_root, output, transform)
-    print(f'Elderbug: {idle["name"]}, {len(frames)} frames, {len(sprites)} sprites, {pages} page')
+    (output/f'{npc}-visual.bin').write_bytes(table)
+    print(f'{npc}: {idle["name"]}, {len(frames)} frames, {len(sprites)} sprites, {pages} page')
 
 
 if __name__ == '__main__':

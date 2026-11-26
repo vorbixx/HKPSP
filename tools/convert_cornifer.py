@@ -12,6 +12,9 @@ from tool_paths import TEX3DS as TEX3DS_EXE
 
 KEYS = ('CORNIFER_MEET','CROSSROADS_GREET','CORNIFER_AGAIN','CORNIFER_PROMPT','CORNIFER_REFUSE',
         'CORNIFER_NOT_ENOUGH','CROSSROADS_BOUGHT','CORNIFER_CARD','MAP_NAME_CROSSROADS')
+REGIONS = ('GREENPATH', 'FUNGAL_WASTES', 'ABYSS', 'DEEPNEST')
+KEYS += tuple(key for area in REGIONS for key in (area+'_GREET',area+'_BOUGHT','MAP_NAME_'+area))
+KEYS += tuple('CORNIFER_'+state+'_DP' for state in ('MEET','AGAIN','REFUSE','NOT_ENOUGH'))
 # Cornifer sprites are Unity sprites at texelSize 1/64 (64 px per unit); downsample_sprite halves the
 # atlas textures, so one atlas texel is 2/64 = 1/32 unit. Card extents must use the same scale.
 ORIGINAL_PIXELS_PER_UNIT = 64
@@ -59,7 +62,7 @@ def dialogue(source):
     entries={e.attrib.get('name',''):''.join(e.itertext()) for e in root.iter('entry')}
     ui=ET.parse(source/'EN_UI-decrypted.xml')
     entries.update({e.attrib['name']:''.join(e.itertext()) for e in ui.iter('entry')
-                    if e.attrib.get('name')=='MAP_NAME_CROSSROADS'})
+                    if e.attrib.get('name','').startswith('MAP_NAME_')})
     result=[]; actual={}
     for key in KEYS:
         candidates=ALIASES.get(key,(key,))

@@ -18,7 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import transcode_room as room
 from transcode_hud import read_psa
 
-CLIPS = ('Spirit', 'Spirit End', 'Shade Soul')
+CLIPS = ('Spirit', 'Spirit End', 'Shade Soul', 'Shaman Idle', 'Shaman Talk')
 SOURCE_PAGE_NAME = 'ability-page-0.png'
 
 

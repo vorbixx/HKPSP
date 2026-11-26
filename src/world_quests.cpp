@@ -19,16 +19,42 @@ constexpr const char* elderbugKeys[]={
     "ELDERBUG_HINT_FUNGAL_WASTES","ELDERBUG_HINT_GREENPATH"};
 constexpr unsigned elderbugCount=sizeof(elderbugKeys)/sizeof(*elderbugKeys);
 static_assert(elderbugCount==unsigned(WorldQuestTalk::HintGreenpath)-unsigned(WorldQuestTalk::IntroNormal)+1);
+constexpr struct QuirrelPlacement {
+    const char* scene;
+    unsigned level,owner,count;
+    const char* keys[4];
+} quirrelPlacements[]={
+    {"Fungus2_01",165,1786,3,{"QUIRREL_QUEENSTATION_01","QUIRREL_QUEENSTATION_02","QUIRREL_QUEENSTATION_REPEAT"}},
+    {"Fungus2_14",178,2019,2,{"QUIRREL_MANTIS_01","QUIRREL_MANTIS_REPEAT"}},
+    {"Ruins1_02",89,1179,4,{"QUIRREL_RUINS_1","QUIRREL_RUINS_2","QUIRREL_RUINS_3","QUIRREL_RUINS_4"}},
+    {"Fungus3_47",223,433,2,{"QUIRREL_FOGCANYON_A","QUIRREL_FOGCANYON_B"}},
+};
+const QuirrelPlacement* quirrelPlacement(const char* scene){
+    if(scene)for(const auto& placement:quirrelPlacements)
+        if(!std::strcmp(scene,placement.scene))return &placement;
+    return nullptr;
+}
 }
 bool WorldQuests::bind(const WorldQuestDefinition& d) {
     bound_=present_=inRoom_=awake_=false;talk_=WorldQuestTalk::None;dialogues_={};
     titleActive_=titleClosing_=false;titleAge_=0;
-    elderbugDialogues_={};elderbugHintGiven_=false;
+    extendedDialogues_={};elderbugHintGiven_=seerGreeted_=false;
+    quirrelTalks_=0;
     const bool bretta=d.event==WorldQuestEvent::BrettaRescued;
-    const bool elderbug=d.event==WorldQuestEvent::Elderbug;
-    if((d.event!=WorldQuestEvent::SlyRescued&&!bretta&&!elderbug)||!d.owner||!d.sourceId||
-       d.sourceId!=(elderbug?7000000u:bretta?187000000u:20000000u)+d.owner||d.owner>=1000000u||
-       !std::memchr(d.scene,0,sizeof(d.scene))||std::strcmp(d.scene,elderbug?"Town":bretta?"Fungus2_23":"Room_ruinhouse")||
+    const bool town=d.event==WorldQuestEvent::Elderbug||d.event==WorldQuestEvent::Tiso;
+    if(!std::memchr(d.scene,0,sizeof(d.scene)))return false;
+    const auto* quirrel=d.event==WorldQuestEvent::Quirrel?quirrelPlacement(d.scene):nullptr;
+    const bool seer=d.event==WorldQuestEvent::Seer;
+    const bool lemm=d.event==WorldQuestEvent::Lemm;
+    if((d.event!=WorldQuestEvent::SlyRescued&&!bretta&&!town&&!quirrel&&!seer&&!lemm)||!d.owner||!d.sourceId||
+       d.sourceId!=1000000u*(quirrel?quirrel->level:seer?242u:lemm?93u:town?7u:bretta?187u:20u)+d.owner||d.owner>=1000000u||
+       (quirrel? (d.owner!=quirrel->owner||d.ownerCount!=1||d.owners[0]!=d.owner):
+        seer?(std::strcmp(d.scene,"RestingGrounds_07")||d.owner!=36||d.ownerCount!=1||d.owners[0]!=36):
+        lemm?(std::strcmp(d.scene,"Ruins1_05b")||d.owner!=17||d.ownerCount!=1||d.owners[0]!=17||
+              !(d.shopRange.left<d.shopRange.right&&d.shopRange.bottom<d.shopRange.top)||
+              !std::isfinite(d.shopRange.left)||!std::isfinite(d.shopRange.right)||
+              !std::isfinite(d.shopRange.bottom)||!std::isfinite(d.shopRange.top)):
+        std::strcmp(d.scene,town?"Town":bretta?"Fungus2_23":"Room_ruinhouse"))||
        !std::isfinite(d.range.left)||!std::isfinite(d.range.right)||
        !std::isfinite(d.range.bottom)||!std::isfinite(d.range.top)||
        !std::isfinite(d.position.x)||!std::isfinite(d.position.y)||
@@ -41,6 +67,13 @@ bool WorldQuests::bind(const WorldQuestDefinition& d) {
     definition_=d;bound_=true;return true;
 }
 bool WorldQuests::loadScene(const char* root,const char* scene) {
+    const bool seer=scene&&!std::strcmp(scene,"RestingGrounds_07");
+    const bool lemm=scene&&!std::strcmp(scene,"Ruins1_05b");
+    if(root&&(seer||lemm||quirrelPlacement(scene))){
+        char path[512];
+        const int length=std::snprintf(path,sizeof(path),"%s/rooms/%s/%s.bin",root,scene,seer?"seer":lemm?"lemm":"quirrel");
+        return length>0&&static_cast<unsigned>(length)<sizeof(path)?load(path):bind({});
+    }
     const char* name=nullptr;
     if(scene&&!std::strcmp(scene,"Room_ruinhouse"))name="world-quests.bin";
     else if(scene&&!std::strcmp(scene,"Fungus2_23"))name="bretta-quest.bin";
@@ -52,6 +85,10 @@ bool WorldQuests::loadScene(const char* root,const char* scene) {
     return load(path);
 }
 const char* WorldQuests::artPrefix() const {
+    if(definition_.event==WorldQuestEvent::Lemm)return "lemm";
+    if(definition_.event==WorldQuestEvent::Seer)return "seer";
+    if(definition_.event==WorldQuestEvent::Quirrel)return "quirrel";
+    if(definition_.event==WorldQuestEvent::Tiso)return "tiso";
     if(definition_.event==WorldQuestEvent::Elderbug)return "elderbug";
     return definition_.event==WorldQuestEvent::BrettaRescued?"bretta-quest":"world-quest";
 }
@@ -63,21 +100,33 @@ bool WorldQuests::load(const char* path) {
     auto* f=std::fopen(path,"rb");if(!f)return false;
     WorldQuestDefinition d;char magic[4];unsigned event=0;
     std::array<std::array<char,768>,5> dialogues{};
-    bool ok=std::fread(magic,1,4,f)==4&&(!std::memcmp(magic,"WQ01",4)||!std::memcmp(magic,"WQ02",4)||!std::memcmp(magic,"WQ03",4)||!std::memcmp(magic,"WQ04",4))&&
+    bool ok=std::fread(magic,1,4,f)==4&&!std::memcmp(magic,"WQ0",3)&&magic[3]>='1'&&magic[3]<='8'&&
         std::fread(&event,4,1,f)==1&&std::fread(&d.sourceId,4,1,f)==1&&
         std::fread(&d.owner,4,1,f)==1&&std::fread(d.scene,1,32,f)==32&&
         std::fread(&d.range,sizeof(Rect),1,f)==1;
-    if(ok&&(!std::memcmp(magic,"WQ03",4)||!std::memcmp(magic,"WQ04",4)))ok=std::fread(&d.position,sizeof(Vec2),1,f)==1&&
+    const bool tiso=ok&&!std::memcmp(magic,"WQ05",4);
+    const bool quirrel=ok&&!std::memcmp(magic,"WQ06",4);
+    const bool seer=ok&&!std::memcmp(magic,"WQ07",4);
+    const bool lemm=ok&&!std::memcmp(magic,"WQ08",4);
+    const auto* placement=quirrel&&std::memchr(d.scene,0,sizeof(d.scene))?quirrelPlacement(d.scene):nullptr;
+    if(ok&&magic[3]>='3')ok=std::fread(&d.position,sizeof(Vec2),1,f)==1&&
         std::fread(&d.scale,sizeof(Vec2),1,f)==1&&std::isfinite(d.position.x)&&std::isfinite(d.position.y)&&
         std::isfinite(d.scale.x)&&std::isfinite(d.scale.y)&&d.scale.x!=0&&d.scale.y!=0;
     const bool elderbug=ok&&!std::memcmp(magic,"WQ04",4);
-    ok=ok&&(elderbug==(event==unsigned(WorldQuestEvent::Elderbug)));
-    std::vector<std::array<char,768>> elderbugDialogues(elderbug?elderbugCount:0);
+    ok=ok&&(elderbug==(event==unsigned(WorldQuestEvent::Elderbug)))&&(tiso==(event==unsigned(WorldQuestEvent::Tiso)));
+    ok=ok&&(quirrel==(event==unsigned(WorldQuestEvent::Quirrel)))&&(!quirrel||placement);
+    ok=ok&&(seer==(event==unsigned(WorldQuestEvent::Seer)));
+    ok=ok&&(lemm==(event==unsigned(WorldQuestEvent::Lemm)));
+    constexpr unsigned seerCount=9;
+    constexpr unsigned lemmCount=unsigned(WorldQuestTalk::LemmNoRelics)-unsigned(WorldQuestTalk::LemmIntro)+1;
+    const unsigned extendedCount=elderbug?elderbugCount:seer?seerCount:lemm?lemmCount:0;
+    std::vector<std::array<char,768>> extendedDialogues(extendedCount);
     if(ok&&std::memcmp(magic,"WQ01",4)){
         ok=std::fread(&d.ownerCount,4,1,f)==1&&d.ownerCount>0&&d.ownerCount<=d.owners.size()&&
             std::fread(d.owners.data(),4,d.ownerCount,f)==d.ownerCount;
-        for(unsigned i=0;i<(elderbug?elderbugCount:4u);++i){
-            auto& text=elderbug?elderbugDialogues[i]:dialogues[i];
+        if(ok&&lemm)ok=std::fread(&d.shopRange,sizeof(Rect),1,f)==1;
+        for(unsigned i=0;i<(extendedCount?extendedCount:placement?placement->count:tiso?2u:4u);++i){
+            auto& text=extendedCount?extendedDialogues[i]:dialogues[i];
             unsigned length=0;
             if(!ok)break;
             ok=std::fread(&length,4,1,f)==1&&length>0&&length<text.size()&&
@@ -87,7 +136,7 @@ bool WorldQuests::load(const char* path) {
     ok=ok&&std::fgetc(f)==EOF&&!std::ferror(f);
     std::fclose(f);d.event=WorldQuestEvent(event);
     if(!ok||!bind(d))return false;
-    dialogues_=dialogues;elderbugDialogues_.swap(elderbugDialogues);return true;
+    dialogues_=dialogues;extendedDialogues_.swap(extendedDialogues);return true;
 }
 const char* WorldQuests::playerDataField(WorldQuestEvent event) {
     return event==WorldQuestEvent::SlyRescued?"slyRescued":event==WorldQuestEvent::BrettaRescued?"brettaRescued":nullptr;
@@ -96,7 +145,8 @@ void WorldQuests::enter(const char* scene,const CollectibleProgress& progress,bo
     inRoom_=bound_&&scene&&!std::strcmp(scene,definition_.scene);
     present_=inRoom_&&!rescued&&!completed(definition_.event,progress);
     talk_=WorldQuestTalk::None;awake_=false;
-    elderbugHintGiven_=false;
+    elderbugHintGiven_=seerGreeted_=false;
+    quirrelTalks_=0;
     titleActive_=titleClosing_=false;titleAge_=0;
     bindArt(art_);
 }
@@ -105,6 +155,10 @@ void WorldQuests::bindArt(const AnimationBank* art) {
     if(art_)animation_.play(art_->require(animationClip(awake_?"Idle":"Dazed")));
 }
 const char* WorldQuests::animationClip(const char* phase) const {
+    if(definition_.event==WorldQuestEvent::Lemm)return "Lemm Idle";
+    if(definition_.event==WorldQuestEvent::Seer)return "Seer Idle";
+    if(definition_.event==WorldQuestEvent::Quirrel)return "Quirrel Idle";
+    if(definition_.event==WorldQuestEvent::Tiso)return "Tiso Idle";
     if(definition_.event==WorldQuestEvent::Elderbug)return "Elderbug Idle";
     const bool bretta=definition_.event==WorldQuestEvent::BrettaRescued;
     if(!std::strcmp(phase,"Wake"))return bretta?"Bretta Wake":"Sly Wake";
@@ -126,13 +180,20 @@ void WorldQuests::step(float seconds) {
 }
 bool WorldQuests::nearby(Rect h) const {
     const auto r=definition_.range;
-    return present_&&h.left<r.right&&h.right>r.left&&h.bottom<r.top&&h.top>r.bottom;
+    return lemmShopNearby(h)||(present_&&h.left<r.right&&h.right>r.left&&h.bottom<r.top&&h.top>r.bottom);
+}
+bool WorldQuests::lemmShopNearby(Rect hero) const {
+    const auto range=definition_.shopRange;
+    return present_&&definition_.event==WorldQuestEvent::Lemm&&hero.left<range.right&&hero.right>range.left&&
+        hero.bottom<range.top&&hero.top>range.bottom;
 }
 bool WorldQuests::elderbugWalkedBy(Rect hero,bool visitedCrossroads,const SavedPlayerData& data) const {
-    constexpr Rect callRange{138.49287f,9.465004f,146.41555f,26.725105f};
+    // Entering the original Call Range happens before a new player can reach
+    // Elderbug from King's Pass. Only select the walked-by intro once the hero
+    // has actually crossed to the far side of his conversation range.
+    const auto range=definition_.range;
     return present_&&definition_.event==WorldQuestEvent::Elderbug&&
-           hero.left<callRange.right&&hero.right>callRange.left&&
-           hero.bottom<callRange.top&&hero.top>callRange.bottom&&
+           hero.right<range.left&&hero.bottom<range.top&&hero.top>range.bottom&&
            !visitedCrossroads&&!data.get("metElderbug")&&data.get("elderbug")==0;
 }
 bool WorldQuests::completed(WorldQuestEvent event,const CollectibleProgress& p) const {
@@ -152,7 +213,27 @@ bool WorldQuests::beginTalk(Collectibles& collectibles) {
     }
     return true;
 }
-bool WorldQuests::finishDialogue() {
+bool WorldQuests::beginTiso(bool encountered) {
+    if(!present_||talking()||definition_.event!=WorldQuestEvent::Tiso)return false;
+    talk_=encountered?WorldQuestTalk::Rescue2:WorldQuestTalk::Rescue1;
+    return true;
+}
+bool WorldQuests::finishDialogue(bool plantComplete,bool xeroDefeated) {
+    if(definition_.event==WorldQuestEvent::Lemm&&talking()){cancelTalk();return true;}
+    if(definition_.event==WorldQuestEvent::Seer&&talking()){
+        using Talk=WorldQuestTalk;
+        switch(talk_){
+        case Talk::SeerMeetA:case Talk::SeerMeetB:talk_=Talk::SeerIntro;break;
+        case Talk::SeerIntro:talk_=Talk::SeerIntroEnd;break;
+        case Talk::SeerIntroEnd:seerGreeted_=true;cancelTalk();break;
+        case Talk::SeerGreet:talk_=Talk::SeerQuest;break;
+        case Talk::SeerQuest:talk_=!plantComplete?Talk::SeerPlant:!xeroDefeated?Talk::SeerXero:Talk::SeerGeneric;break;
+        default:cancelTalk();break;
+        }
+        return true;
+    }
+    if(definition_.event==WorldQuestEvent::Quirrel&&talking()){cancelTalk();return true;}
+    if(definition_.event==WorldQuestEvent::Tiso&&talking()){cancelTalk();return true;}
     if(definition_.event==WorldQuestEvent::Elderbug&&talk_>=WorldQuestTalk::IntroMain){cancelTalk();return true;}
     switch(talk_){
     case WorldQuestTalk::IntroNormal:case WorldQuestTalk::IntroWalkedBy:case WorldQuestTalk::IntroVisitedCrossroads:
@@ -167,6 +248,37 @@ bool WorldQuests::finishDialogue() {
     case WorldQuestTalk::Rescue4:case WorldQuestTalk::Repeat:cancelTalk();break;
     default:return false;
     }
+    return true;
+}
+bool WorldQuests::beginLemm(bool shop,const SavedPlayerData& data,bool dung,bool superDash,const char*& flag){
+    flag=nullptr;
+    if(!present_||talking()||definition_.event!=WorldQuestEvent::Lemm)return false;
+    using Talk=WorldQuestTalk;
+    if(dung&&!shop)talk_=Talk::LemmDung;
+    else if(!data.get("metRelicDealerShop")){talk_=Talk::LemmIntro;flag="metRelicDealerShop";}
+    else if(shop)talk_=dung?Talk::LemmDung:Talk::LemmNoRelics;
+    else if(data.get("honedNail")&&!data.get("marmConvoNailsmith")){talk_=Talk::LemmNailsmith;flag="marmConvoNailsmith";}
+    else if(!data.get("marmConvo1")){talk_=Talk::LemmConvo1;flag="marmConvo1";}
+    else if(!data.get("marmConvo2")){talk_=Talk::LemmConvo2;flag="marmConvo2";}
+    else if(superDash&&!data.get("marmConvo3")){talk_=Talk::LemmConvo3;flag="marmConvo3";}
+    else talk_=Talk::LemmRepeat;
+    return true;
+}
+bool WorldQuests::beginSeer(bool met,bool ignored){
+    if(!present_||talking()||definition_.event!=WorldQuestEvent::Seer)return false;
+    using Talk=WorldQuestTalk;
+    talk_=met?(seerGreeted_?Talk::SeerQuest:Talk::SeerGreet):ignored?Talk::SeerMeetB:Talk::SeerMeetA;
+    if(talk_==Talk::SeerGreet)seerGreeted_=true;
+    return true;
+}
+bool WorldQuests::beginQuirrel(unsigned cityTalks){
+    if(!present_||talking()||definition_.event!=WorldQuestEvent::Quirrel)return false;
+    const auto& placement=*quirrelPlacement(definition_.scene);
+    const unsigned index=std::min(placement.level==89?cityTalks:quirrelTalks_,placement.count-1);
+    static constexpr WorldQuestTalk talks[]={WorldQuestTalk::Rescue1,WorldQuestTalk::Rescue2,
+        WorldQuestTalk::Rescue3,WorldQuestTalk::Repeat};
+    talk_=talks[index];
+    quirrelTalks_=std::min(index+1,placement.count-1);
     return true;
 }
 bool WorldQuests::beginElderbug(bool visitedCrossroads,const SavedPlayerData& data,const char*& flag) {
@@ -225,12 +337,24 @@ void WorldQuests::cancelTalk() {
     }
 }
 const char* WorldQuests::dialogueKey() const {
+    static const char* lemm[]={"RELICDEALER_SHOP_INTRO","RELICDEALER_CONVO_1","RELICDEALER_TALK","RELICDEALER_TALK_2",
+        "RELICDEALER_TALK_REPEAT","RELICDEALER_DUNG","RELICDEALER_NAILSMITH","RELICDEALER_NO_RELICS"};
+    if(talking()&&definition_.event==WorldQuestEvent::Lemm)return lemm[dialogueIndex()];
+    static const char* seer[]={"WITCH_MEET_A","WITCH_MEET_B","WITCH_INTRO","WITCH_INTRO","WITCH_GREET",
+        "WITCH_QUEST_1","WITCH_HINT_DREAMPLANT","WITCH_HINT_XERO","WITCH_GENERIC"};
+    if(talking()&&definition_.event==WorldQuestEvent::Seer)return seer[dialogueIndex()];
+    if(talking()&&definition_.event==WorldQuestEvent::Quirrel)
+        return quirrelPlacement(definition_.scene)->keys[dialogueIndex()];
+    if(talking()&&definition_.event==WorldQuestEvent::Tiso)
+        return talk_==WorldQuestTalk::Rescue1?"TISO_TOWN_GREET":"TISO_TOWN_REPEAT";
     if(talking()&&definition_.event==WorldQuestEvent::Elderbug)return elderbugKeys[dialogueIndex()];
     static const char* keys[]={"SLY_RESCUE_1","SLY_RESCUE_2","SLY_RESCUE_3","SLY_RESCUE_REPEAT"};
     static const char* bretta[]={"BRETTA_RESCUE_1","BRETTA_RESCUE_2","BRETTA_RESCUE_3","BRETTA_RESCUE_4","BRETTA_RESCUE_5"};
     return !talking()?"":definition_.event==WorldQuestEvent::BrettaRescued?bretta[dialogueIndex()]:keys[dialogueIndex()];
 }
 unsigned WorldQuests::dialogueIndex() const {
+    if(definition_.event==WorldQuestEvent::Lemm)return unsigned(talk_)-unsigned(WorldQuestTalk::LemmIntro);
+    if(definition_.event==WorldQuestEvent::Seer)return unsigned(talk_)-unsigned(WorldQuestTalk::SeerMeetA);
     if(definition_.event==WorldQuestEvent::Elderbug)return unsigned(talk_)-unsigned(WorldQuestTalk::IntroNormal);
     if(definition_.event==WorldQuestEvent::BrettaRescued){
         if(talk_==WorldQuestTalk::Rescue4)return 3;
@@ -241,8 +365,8 @@ unsigned WorldQuests::dialogueIndex() const {
 const char* WorldQuests::text() const {
     if(!talking())return "";
     const unsigned index=dialogueIndex();
-    if(definition_.event==WorldQuestEvent::Elderbug)
-        return index<elderbugDialogues_.size()?elderbugDialogues_[index].data():"";
+    if(definition_.event==WorldQuestEvent::Elderbug||definition_.event==WorldQuestEvent::Seer||definition_.event==WorldQuestEvent::Lemm)
+        return index<extendedDialogues_.size()?extendedDialogues_[index].data():"";
     return dialogues_[index].data();
 }
 bool WorldQuests::hides(unsigned owner) const {

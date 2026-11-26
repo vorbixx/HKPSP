@@ -36,7 +36,7 @@ public:
             // Original "Cornifer Card" (level64 GameObject 1132, Transform 2250, no parent, scale 1):
             // its own spot 1.25 units below Cornifer (x=36.31, y=34.69). The 3DS drew it at
             // Cornifer's pivot (main.cpp:560), so it floated above the floor (user 2026-11-18).
-            pose.position={cardX,cardY};
+            pose.position=npc.cardPosition;
             appendActor(list,bank_,card_,pose,camera,page_);
         }
     }

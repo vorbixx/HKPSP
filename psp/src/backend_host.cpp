@@ -349,7 +349,7 @@ public:
             if(name=="hud-visual.bin")return assets/"hud/hud-visual.psp.bin";
             if(name=="region-title.bin"||name.rfind("region-title-page-",0)==0)return assets/"hud"/name;
             if(name=="inventory.bin")return assets/"inventory/inventory.psp.bin";
-            if(name=="map-page-0.hpt")return assets/"map"/name;
+            if(name=="map-page-0.hpt"||name=="map-regions.hpt")return assets/"map"/name;
             if(name.rfind("inventory-page-",0)==0)return assets/"inventory"/name.substr(10);
             if(name.rfind("hud-page-",0)==0)return assets/"hud"/name.substr(4);
             if(name=="fonts.bin")return assets/"fonts/fonts.bin";

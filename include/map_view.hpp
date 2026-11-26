@@ -1,5 +1,6 @@
 #pragma once
 #include "map_data.hpp"
+#include "map_regional_data.hpp"
 #include "simple_map.hpp"
 #include "inventory.hpp"
 #include <cstring>
@@ -23,6 +24,20 @@ inline std::size_t mapRoomIndex(const char* id)
         if(std::strcmp(mapdata::rooms[i].id,id)==0)return i;
     return mapdata::roomCount;
 }
+inline constexpr auto savedMapRoomCount=mapdata::roomCount+regionalmap::roomCount;
+static_assert(savedMapRoomCount<=CartographySave::roomCount);
+inline std::size_t savedMapRoomIndex(const char* id)
+{
+    const auto index=mapRoomIndex(id);
+    if(index<mapdata::roomCount)return index;
+    if(id)for(std::size_t regional=0;regional<regionalmap::roomCount;++regional)
+        if(std::strcmp(regionalmap::rooms[regional].id,id)==0)return mapdata::roomCount+regional;
+    return savedMapRoomCount;
+}
+inline const mapdata::Room& savedMapRoom(std::size_t index)
+{
+    return index<mapdata::roomCount?mapdata::rooms[index]:regionalmap::rooms[index-mapdata::roomCount];
+}
 inline bool mapRevealed(const SimpleMap& map,const char* id)
 {
     const auto index=mapRoomIndex(id);
@@ -36,7 +51,7 @@ inline bool mapRevealed(const SimpleMap& map,const char* id)
 }
 inline unsigned mapInkImage(const CartographySave& state,const mapdata::Room& art,std::size_t index)
 {
-    return !state.ownsCrossroads()||art.area!=1||
+    return !state.ownsArea(art.area)||
            state.mappedRoom(index)||art.rough==~0u?art.image:art.rough;
 }
 inline Vec2 mapHeroPosition(const mapdata::Room& art,Rect bounds,Vec2 hero)

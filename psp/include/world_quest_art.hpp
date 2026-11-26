@@ -31,7 +31,15 @@ public:
         if(texture.width!=512||texture.height!=512)throw std::runtime_error("World quest page size");
         const bool bretta=definition.event==hk3ds::WorldQuestEvent::BrettaRescued;
         const bool elderbug=definition.event==hk3ds::WorldQuestEvent::Elderbug;
-        const std::vector<const char*> clips=elderbug?std::vector<const char*>{"Elderbug Idle"}:
+        const bool tiso=definition.event==hk3ds::WorldQuestEvent::Tiso;
+        const bool quirrel=definition.event==hk3ds::WorldQuestEvent::Quirrel;
+        const bool seer=definition.event==hk3ds::WorldQuestEvent::Seer;
+        const bool lemm=definition.event==hk3ds::WorldQuestEvent::Lemm;
+        const std::vector<const char*> clips=lemm?std::vector<const char*>{"Lemm Idle"}:
+            seer?std::vector<const char*>{"Seer Idle"}:
+            quirrel?std::vector<const char*>{"Quirrel Idle"}:
+            tiso?std::vector<const char*>{"Tiso Idle"}:
+            elderbug?std::vector<const char*>{"Elderbug Idle"}:
             bretta?std::vector<const char*>{"Bretta Dazed","Bretta Wake"}:
             std::vector<const char*>{"Sly Dazed","Sly Wake","Sly Idle"};
         for(const auto* name:clips)

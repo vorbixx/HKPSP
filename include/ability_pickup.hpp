@@ -221,7 +221,9 @@ struct AbilityPickup {
                 if(kind==Kind::CrystalHeart){hero.facingRight=true;hero.velocity.x=8;}
                 return false;
             }
-            age=0;phase=kind==Kind::Spirit?Phase::Dialogue:(kind==Kind::ShadeSoul?Phase::Confirm:Phase::Item);
+            // Temporary (user 2026-11-26): the Shaman grants Vengeful Spirit at once on Listen;
+            // the Shaman conversation and gate quest return once they are verified.
+            age=0;phase=kind==Kind::ShadeSoul?Phase::Confirm:Phase::Item;
             if(phase==Phase::Item){collected=true;hero.velocity={};hero.controlEnabled=false;return true;}
         }else if(confirm&&age>.35f){
             age=0;
