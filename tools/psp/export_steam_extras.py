@@ -159,8 +159,18 @@ def link_legacy_inputs(game_data):
     target = game_data.resolve(strict=True)
     for relative in LEGACY_INPUTS:
         link = ROOT / relative
-        if link.exists():
-            continue
+        # A junction made by another Windows account is an untrusted mount point on Windows 11 24H2
+        # (WinError 448, laptop 2026-11-27): exists() raises or the folder cannot be listed. Recreate
+        # only the link for this account; the game files it points at are never touched.
+        try:
+            if link.exists():
+                next(link.iterdir(), None)
+                continue
+        except OSError:
+            print(f'Recreating the link to the game data for this account: {link}', flush=True)
+            os.rmdir(link)
+        if os.path.lexists(link):
+            os.rmdir(link)
         link.parent.mkdir(parents=True, exist_ok=True)
         if os.name == 'nt':
             # A junction needs no Developer Mode or administrator rights.

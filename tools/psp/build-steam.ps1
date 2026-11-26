@@ -145,6 +145,23 @@ if ($Check) {
     return
 }
 
+# A junction made by another Windows account is an untrusted mount point on Windows 11 24H2
+# (laptop 2026-11-27): it cannot be traversed, the hash check below failed and the build stopped.
+# When the link points at the same Steam folder, recreate only the link for this account.
+$sameLink = $false
+$existingLink = Get-Item -LiteralPath $archive -Force -ErrorAction SilentlyContinue
+if ($SteamGame -and $existingLink -and $existingLink.LinkType -in @('Junction', 'SymbolicLink')) {
+    $linkTarget = [IO.Path]::GetFullPath([string]@($existingLink.Target)[0]).TrimEnd('\', '/')
+    if ($linkTarget -ieq $steam.TrimEnd('\', '/')) {
+        $sameLink = $true
+        try { Get-ChildItem -LiteralPath $archive -Force -ErrorAction Stop | Out-Null }
+        catch {
+            "Recreating the link to the Steam game for this account: $archive"
+            $existingLink.Delete()
+            New-Item -ItemType $(if ($IsWindows) { 'Junction' } else { 'SymbolicLink' }) -Path $archive -Target $steam | Out-Null
+        }
+    }
+}
 # Keep the original files read only. A junction is useful on a small build
 # drive and allows the converters to retain their stable archive paths.
 if ($UseInstalledFiles -and -not (Test-Path -LiteralPath $archive -PathType Container)) {
@@ -186,7 +203,7 @@ if ($UseInstalledFiles -and -not (Test-Path -LiteralPath $archive -PathType Cont
             }
         }
     }
-} elseif ($SteamGame) {
+} elseif ($SteamGame -and -not $sameLink) {
     foreach ($file in $required) {
         $installed = Join-Path $gameData $file
         $copied = Join-Path $archive "hollow_knight_Data/$file"
