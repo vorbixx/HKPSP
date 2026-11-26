@@ -290,7 +290,8 @@ def heartbeat_line(started, folder, now=None, skip=''):
     now = time.time() if now is None else now
     minutes = int(now - started) // 60
     line = f'Still working ({minutes // 60} h {minutes % 60:02d} min).'
-    logs = [p for p in Path(folder).glob('*.log') if p.is_file() and p.name != skip]
+    folders = folder if isinstance(folder, (list, tuple)) else [folder]
+    logs = [p for f in folders for p in Path(f).glob('*.log') if p.is_file() and p.name != skip]
     if logs:
         newest = max(logs, key=lambda p: p.stat().st_mtime)
         idle = int(now - newest.stat().st_mtime) // 60
@@ -308,7 +309,9 @@ def run_build(command, log_path, env, echo=print, heartbeat=300):
 
     def beat():
         while not done.wait(heartbeat):
-            echo(heartbeat_line(started, log_path.parent, skip=log_path.name))
+            # The resources step writes one log per converter under build/regen/logs (laptop 2026-11-27:
+            # steam-build looked idle for 20 min while converters ran).
+            echo(heartbeat_line(started, [log_path.parent, ROOT / 'build/regen/logs'], skip=log_path.name))
 
     with open(log_path, 'w', encoding='utf-8', errors='replace') as log:
         with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
