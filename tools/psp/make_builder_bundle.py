@@ -180,6 +180,10 @@ def main(argv=None):
     if args.release and args.output.exists() and any(args.output.iterdir()):
         raise SystemExit(f'{args.output} is not empty; a release bundle starts from an empty folder.')
     bundle = assemble(manifest, source_root(), args.downloads, args.output)
+    site = args.output / 'runtime/python/Lib/site-packages'
+    if args.platform == 'windows' and site.is_dir():
+        # Owner-only temp folders broke non-admin builds; see bundle/sitecustomize.py.
+        shutil.copy2(ROOT / 'tools/psp/bundle/sitecustomize.py', site / 'sitecustomize.py')
     if args.release:
         info = add_release(args.output, args.platform, eboot=args.eboot, pwsh=args.pwsh)
         bundle['prebuilt'] = 'prebuilt'
