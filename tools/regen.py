@@ -1099,7 +1099,7 @@ def main():
         from functools import partial
         sys.path.insert(0, str(ROOT / 'tools/psp'))
         from room_packages import census_itinerary
-        itinerary = census_itinerary(ROOT / 'docs/tasks/minimum-route.md')
+        itinerary = census_itinerary(ROOT / 'tools/psp/route-itinerary.md')
         route = {scene for rows in itinerary.values() for scene, status in rows
                  if status != 'U' and scene != 'Tutorial_01'}
         rules = partial(rules, scene_filter=route)

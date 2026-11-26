@@ -234,7 +234,7 @@ def main():
     parser.add_argument("--source", type=Path, default=room.source_root())
     parser.add_argument("--out", type=Path, default=room.REPO / "_private/converted-psp")
     parser.add_argument("--stage", type=Path, default=DEFAULT_STAGE,
-                        help="Stage JSON or HK3DS minimum-route.md (all census legs by default)")
+                        help="Stage JSON or route-itinerary.md (all census legs by default)")
     parser.add_argument("--legs", nargs="+", type=int)
     parser.add_argument("--rooms", nargs="+", help="Convert only the named rooms instead of route legs")
     args = parser.parse_args()

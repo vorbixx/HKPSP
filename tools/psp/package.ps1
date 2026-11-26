@@ -1,5 +1,5 @@
 # Build and assemble a play-mode memory-stick tree. Converted private assets are prerequisites.
-# -Route: stage every route room (docs/tasks/minimum-route.md census; run
+# -Route: stage every route room (tools/psp/route-itinerary.md census; run
 # regen-assets.ps1 -Only routerooms first). Default stays the Stage A legs 1-2 for agent iteration.
 # -Eboot/-HostExe (player bundle, with -GameOnly): prebuilt game EBOOT and replay host, so no WSL or g++.
 param([string]$Trace, [switch]$PerfSweep, [switch]$Route, [string[]]$Rooms, [switch]$GameOnly,
@@ -69,7 +69,7 @@ if (-not $Trace) {
 $routeTrace=Join-Path $repo 'build/psp/rooms/package-assets.tsv'
 # A startup trace cannot observe future rooms or shared scene-loader sidecars.
 $stageArgs=@('--trace', $Trace, '--out', $routeTrace)
-if ($Route) { $stageArgs += @('--stage', (Join-Path $repo 'docs/tasks/minimum-route.md')) }
+if ($Route) { $stageArgs += @('--stage', (Join-Path $repo 'tools/psp/route-itinerary.md')) }
 if ($Rooms) {
     & $python -I (Join-Path $PSScriptRoot 'room_packages.py') --rooms @Rooms
     if ($LASTEXITCODE -ne 0) { throw "Additional room conversion failed: $LASTEXITCODE" }

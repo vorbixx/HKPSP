@@ -57,7 +57,7 @@ SOURCE_ONLY = {extra for extras in SOURCE_SCENES.values() for extra in extras}
 
 
 def route_scenes():
-    itinerary = census_itinerary(ROOT / 'docs/tasks/minimum-route.md')
+    itinerary = census_itinerary(ROOT / 'tools/psp/route-itinerary.md')
     return tuple(dict.fromkeys(scene for rows in itinerary.values() for scene, status in rows
                                if (status != 'U' or scene in DREAM_SCENES) and scene != 'Tutorial_01'))
 

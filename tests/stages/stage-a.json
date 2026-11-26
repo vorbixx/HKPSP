@@ -2,7 +2,7 @@
   "version": 1,
   "name": "Stage A",
   "start": "Tutorial_01",
-  "contract": "docs/progression-plan.md Phase 0 item 1; docs/tasks/minimum-route.md legs 1-5",
+  "contract": "docs/progression-plan.md Phase 0 item 1; tools/psp/route-itinerary.md legs 1-5",
   "notes": [
     "Fresh save; literal recorded HID only. Reward checkpoints observe saved conditions and never grant items, health or boss flags.",
     "All 46 checkpoints passed the host ordinary-health replay, including False Knight/City Crest, Vengeful Spirit, Gruz/Sly, Elder Baldur, Hornet and Mothwing Cloak. Greenpath encounter banks are loaded during replay.",
