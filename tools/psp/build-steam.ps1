@@ -314,7 +314,19 @@ try {
     # A 16 GB laptop with a browser open had 2.8 GB free and waited forever without a word
     # (2026-11-27). Player builds run one job at a time down to 1 GB free.
     $oldMinFree = $env:HK3DS_WRITE_MIN_FREE_GB
-    if (-not $oldMinFree) { $env:HK3DS_WRITE_MIN_FREE_GB = '1' }
+    # Count the page file too (commit headroom): with 2.5 GB of free RAM the physical floor let
+    # only 1-2 of 6 converters run while the CPU sat at 1% (laptop 2026-11-27).
+    if (-not $oldMinFree) { $env:HK3DS_WRITE_MIN_FREE_GB = 'commit:2' }
+    # Parallel converters: one per logical core, but at most one per 2 GB of RAM so a weak PC is
+    # not overloaded. Measured peaks (laptop 2026-11-27): scene converters up to 575 MB, average
+    # 163 MB; the developer default (half the cores) left a 12-core laptop at 29% CPU.
+    $oldJobs = $env:HK3DS_REGEN_JOBS
+    if (-not $oldJobs) {
+        $ramGb = if ($IsWindows) { (Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB } else {
+            [double]((Get-Content /proc/meminfo | Select-String '^MemTotal:\s+(\d+)').Matches[0].Groups[1].Value) / 1MB }
+        $env:HK3DS_REGEN_JOBS = [string][Math]::Max(1, [Math]::Min([Environment]::ProcessorCount, [Math]::Floor($ramGb / 2)))
+        "Converters run $($env:HK3DS_REGEN_JOBS) at a time ($([Environment]::ProcessorCount) cores, $([Math]::Round($ramGb)) GB RAM)."
+    }
     $steps = [ordered]@{
         resources = @('tools/regen.ps1', '-Python', $python)
         # The measured Tutorial_01 repack recipe fits the prepared tables only.
@@ -361,5 +373,6 @@ try {
     $env:HKPSP_PYTHON = $oldPython
     $env:HK3DS_PYTHON = $oldRegenPython
     $env:HK3DS_WRITE_MIN_FREE_GB = $oldMinFree
+    $env:HK3DS_REGEN_JOBS = $oldJobs
     Pop-Location
 }
