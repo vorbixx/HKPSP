@@ -820,6 +820,7 @@ def regenerate(root: Path, rules: list[Rule], stamp: Path, *, dry_run=False, rep
         return sum(1 for name in running if name not in restoring)
 
     prepared_at, submitted_at = {}, {}
+    waiting_said = {}
 
     def progress(name, status):
         reported.add(name)
@@ -1023,6 +1024,12 @@ def regenerate(root: Path, rules: list[Rule], stamp: Path, *, dry_run=False, rep
                     wait((*running.values(), *preparing.values()), timeout=10 if memory_blocked else None,
                          return_when=FIRST_COMPLETED)
                 elif memory_blocked:
+                    # 2026-11-27: a laptop waited here for an hour with no output.
+                    if time.perf_counter() - waiting_said.get('at', -1e9) >= 60:
+                        waiting_said['at'] = time.perf_counter()
+                        print(f'Waiting for free memory: {free_memory() / 1024 ** 3:.1f} GB free, '
+                              f'{min_free / 1024 ** 3:.1f} GB needed before {rule.name}. '
+                              'Close other programs or set HK3DS_WRITE_MIN_FREE_GB lower.', flush=True)
                     time.sleep(10)
     finally:
         if not dry_run:

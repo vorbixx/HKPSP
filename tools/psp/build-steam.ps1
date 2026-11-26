@@ -310,6 +310,11 @@ try {
     $env:HKPSP_SOURCE_ROOT = $repo
     $env:HKPSP_PYTHON = $python
     $env:HK3DS_PYTHON = $python  # The shared resource graph still uses this variable name.
+    # The converter scheduler starts a job only with this much RAM free (developer default 4 GB).
+    # A 16 GB laptop with a browser open had 2.8 GB free and waited forever without a word
+    # (2026-11-27). Player builds run one job at a time down to 1 GB free.
+    $oldMinFree = $env:HK3DS_WRITE_MIN_FREE_GB
+    if (-not $oldMinFree) { $env:HK3DS_WRITE_MIN_FREE_GB = '1' }
     $steps = [ordered]@{
         resources = @('tools/regen.ps1', '-Python', $python)
         # The measured Tutorial_01 repack recipe fits the prepared tables only.
@@ -355,5 +360,6 @@ try {
     $env:HKPSP_SOURCE_ROOT = $oldSource
     $env:HKPSP_PYTHON = $oldPython
     $env:HK3DS_PYTHON = $oldRegenPython
+    $env:HK3DS_WRITE_MIN_FREE_GB = $oldMinFree
     Pop-Location
 }
