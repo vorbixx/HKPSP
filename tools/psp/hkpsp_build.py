@@ -255,7 +255,8 @@ def bundle_env(bundle_file, tools, base=None):
     history was 13 GB of a developer build) and header-only 3DS textures (tools/tex3ds_cache.py)."""
     env = dict(os.environ if base is None else base, HKPSP_PYTHON=str(tools['python']),
                HK3DS_REGEN_CACHE='0', HKPSP_TRIM_3DS_TEXTURES='1',
-               HKPSP_FAST_CHECKPOINT='1')
+               HKPSP_FAST_CHECKPOINT='1',
+               HKPSP_STUB_3DS_TEXTURES='1')
     try:
         entries = json.loads(bundle_file.read_text(encoding='utf-8'))
     except (OSError, ValueError):

@@ -34,6 +34,43 @@ def trim_output(command, cwd):
         destination.write_bytes(header)
 
 
+# tex3ds texture formats (GPU_TEXCOLOR); a player build only reads byte 3 of each .t3x.
+FORMAT_CODES = {'rgba8': 0, 'rgb8': 1, 'rgba5551': 2, 'rgb565': 3, 'rgba4': 4, 'la8': 5, 'hilo8': 6,
+                'l8': 7, 'a8': 8, 'la4': 9, 'l4': 10, 'a4': 11, 'etc1': 12, 'etc1a4': 13}
+
+
+def stub_output(command, cwd):
+    """Player builds: write the trimmed .t3x header without running tex3ds.
+
+    The PSP never reads 3DS textures; tools/static_decor_bake.py reads only the format byte and
+    the rest only checks the file exists. tex3ds was 20 of 45 s of a scene conversion
+    (Abyss_19, cache off, 2026-11-27)."""
+    if os.environ.get('HKPSP_STUB_3DS_TEXTURES') != '1' or not isinstance(command, (list, tuple)):
+        return None
+    args = [os.fspath(arg) for arg in command]
+    if '-o' not in args[:-1] or '-f' not in args[:-1]:
+        return None
+    code = FORMAT_CODES.get(args[args.index('-f') + 1].lower())
+    destination = Path(cwd) / args[args.index('-o') + 1]
+    source = Path(cwd) / args[-1]
+    if code is None or destination.suffix.lower() != '.t3x' or not source.is_file():
+        return None
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    if destination.exists():
+        destination.unlink()  # never write through a hardlink shared with another tree
+    # Byte 2 holds log2(size)-3 of the power-of-two texture (width bits 0-2, height bits 3-5),
+    # read by tools/check_memory_budget.py; take it from the PNG header as tex3ds does.
+    with source.open('rb') as stream:
+        png = stream.read(24)
+    if png[:8] != bytes.fromhex('89504e470d0a1a0a'):
+        return None
+    width, height = int.from_bytes(png[16:20], 'big'), int.from_bytes(png[20:24], 'big')
+    def bits(size):
+        return max(0, min(7, (max(size, 8) - 1).bit_length() - 3))
+    destination.write_bytes(bytes((1, 0, bits(width) | bits(height) << 3, code)) + bytes(TRIM_BYTES - 4))
+    return subprocess.CompletedProcess(command, 0, b'', b'')
+
+
 def sha256(path):
     with path.open('rb') as stream:
         return hashlib.file_digest(stream, 'sha256').hexdigest()
@@ -94,6 +131,9 @@ def run(command, *, root=ROOT, directory=None, **kwargs):
                     return subprocess.CompletedProcess(command, 0, stdout, stderr)
         except (OSError, ValueError, TypeError):
             cache = None
+    stubbed = stub_output(command, kwargs.get('cwd') or Path.cwd())
+    if stubbed is not None:
+        return stubbed
     result = subprocess.run(command, **kwargs)
     if result.returncode == 0 and os.environ.get('HKPSP_TRIM_3DS_TEXTURES') == '1':
         trim_output(command, kwargs.get('cwd') or Path.cwd())
