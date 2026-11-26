@@ -204,6 +204,7 @@ if (-not (Test-Path -LiteralPath $archiveManifest -PathType Leaf)) {
 if ($IlspyExe) {
     New-Item -ItemType Directory -Force -Path $logs | Out-Null
     $log = Join-Path $logs 'managed-exports.log'
+    "Starting export managed-exports. Log at $log"
     & $python -I (Join-Path $PSScriptRoot 'export_steam_managed.py') --ilspy $IlspyExe --assembly (Join-Path $archive 'hollow_knight_Data/Managed/Assembly-CSharp.dll') --output (Join-Path $repo '_private/research/decompiled') *> $log
     if ($LASTEXITCODE) {
         Get-Content -LiteralPath $log -Tail 12
@@ -213,6 +214,7 @@ if ($IlspyExe) {
 if ($AssetRipperPort -or $AssetRipperExe) {
     New-Item -ItemType Directory -Force -Path $logs | Out-Null
     $log = Join-Path $logs 'base-exports.log'
+    "Starting export base-exports. Log at $log"
     $exportArgs = if ($AssetRipperExe) { @('--assetripper', $AssetRipperExe, '--game-data', (Join-Path $archive 'hollow_knight_Data')) } else { @('--port', $AssetRipperPort) }
     $exportArgs += '--title-source'
     & $python -I (Join-Path $PSScriptRoot 'export_steam_base.py') @exportArgs *> $log
@@ -224,6 +226,7 @@ if ($AssetRipperPort -or $AssetRipperExe) {
 if ($FreeTypeDll) {
     New-Item -ItemType Directory -Force -Path $logs | Out-Null
     $log = Join-Path $logs 'geo-font.log'
+    "Starting export geo-font. Log at $log"
     & $python -I (Join-Path $PSScriptRoot 'export_steam_geo_font.py') --freetype $FreeTypeDll --research (Join-Path $repo '_private/research') *> $log
     if ($LASTEXITCODE) {
         Get-Content -LiteralPath $log -Tail 12
@@ -238,6 +241,7 @@ if ((Test-Path -LiteralPath (Join-Path $titleDir 'provenance.json') -PathType Le
 if ($Cecil) {
     New-Item -ItemType Directory -Force -Path $logs | Out-Null
     $log = Join-Path $logs 'title-capture.log'
+    "Starting export title-capture. Log at $log"
     & $python -I (Join-Path $PSScriptRoot 'capture_steam_title.py') --steam-manifest $steamManifest --dotnet $DotnetRoot --cecil $Cecil *> $log
     if ($LASTEXITCODE) {
         Get-Content -LiteralPath $log -Tail 12
@@ -246,6 +250,7 @@ if ($Cecil) {
 } elseif (Test-Path -LiteralPath (Join-Path $titleDir 'provenance.json') -PathType Leaf) {
     New-Item -ItemType Directory -Force -Path $logs | Out-Null
     $log = Join-Path $logs 'title-backdrop.log'
+    "Starting export title-backdrop. Log at $log"
     & $python -I (Join-Path $PSScriptRoot 'render_steam_title.py') --source $titleDir --original (Join-Path $archive 'hollow_knight_Data') *> $log
     if ($LASTEXITCODE) {
         Get-Content -LiteralPath $log -Tail 12
@@ -255,6 +260,7 @@ if ($Cecil) {
 if ($Route -and $AssetRipperExe) {
     New-Item -ItemType Directory -Force -Path $logs | Out-Null
     $log = Join-Path $logs 'route-exports.log'
+    "Starting export route-exports. Log at $log"
     $routeArgs = @('--assetripper', $AssetRipperExe, '--game-data', (Join-Path $archive 'hollow_knight_Data'), '--jobs', $Jobs)
     if ($AllRooms) { $routeArgs += '--all-rooms' }
     & $python -I (Join-Path $PSScriptRoot 'export_steam_route.py') @routeArgs *> $log
@@ -265,6 +271,7 @@ if ($Route -and $AssetRipperExe) {
     # Boss, enemy, obstacle and effect sources the converters read beyond the
     # room scenes. Finished jobs are stamped, so a rerun resumes.
     $log = Join-Path $logs 'extra-exports.log'
+    "Starting export extra-exports. Log at $log"
     & $python -I (Join-Path $PSScriptRoot 'export_steam_extras.py') --assetripper $AssetRipperExe --game-data (Join-Path $archive 'hollow_knight_Data') *> $log
     if ($LASTEXITCODE) {
         Get-Content -LiteralPath $log -Tail 12

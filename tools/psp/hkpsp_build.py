@@ -11,6 +11,7 @@ import re
 import shutil
 import subprocess
 import sys
+import threading
 import time
 import zipfile
 from pathlib import Path
@@ -284,17 +285,45 @@ def build_command(tools, game, root=ROOT):
 PROGRESS = re.compile(r'^(Starting \w+|\[\d+/\d+\]|Game package:|ERROR|Exception)')
 
 
-def run_build(command, log_path, env, echo=print):
-    """Run the build, keep the full output in log_path, show progress lines; return the exit code."""
+def heartbeat_line(started, folder, now=None, skip=''):
+    """One reassuring line: elapsed time and the newest step log, so a silent step looks alive."""
+    now = time.time() if now is None else now
+    minutes = int(now - started) // 60
+    line = f'Still working ({minutes // 60} h {minutes % 60:02d} min).'
+    logs = [p for p in Path(folder).glob('*.log') if p.is_file() and p.name != skip]
+    if logs:
+        newest = max(logs, key=lambda p: p.stat().st_mtime)
+        idle = int(now - newest.stat().st_mtime) // 60
+        line += f' Latest log: {newest.name}, updated {idle} min ago.'
+    return line
+
+
+def run_build(command, log_path, env, echo=print, heartbeat=300):
+    """Run the build, keep the full output in log_path, show progress lines; return the exit code.
+
+    Some steps (the AssetRipper exports) print nothing for an hour, so every `heartbeat`
+    seconds a line shows the elapsed time and the newest step log (players 2026-11-26)."""
     log_path.parent.mkdir(parents=True, exist_ok=True)
+    started, done = time.time(), threading.Event()
+
+    def beat():
+        while not done.wait(heartbeat):
+            echo(heartbeat_line(started, log_path.parent, skip=log_path.name))
+
     with open(log_path, 'w', encoding='utf-8', errors='replace') as log:
         with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                               env=env, text=True, encoding='utf-8', errors='replace') as process:
-            for line in process.stdout:
-                log.write(line)
-                log.flush()
-                if PROGRESS.match(line.strip()):
-                    echo(line.rstrip())
+            ticker = threading.Thread(target=beat, daemon=True)
+            ticker.start()
+            try:
+                for line in process.stdout:
+                    log.write(line)
+                    log.flush()
+                    if PROGRESS.match(line.strip()):
+                        echo(line.rstrip())
+            finally:
+                done.set()
+                ticker.join()
         return process.returncode
 
 
