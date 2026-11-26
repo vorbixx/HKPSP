@@ -1,0 +1,96 @@
+{
+  "comment": "Pinned third-party tools of the Linux player builder bundle (docs/tasks/psp-user-builder.md); same schema as builder-bundle.json. Assemble on Linux (file modes and links): every 'download' entry is unpacked into --downloads/<name>. 'system' entries are found on the player's machine at build time.",
+  "platform": "linux",
+  "start": "tools/psp/bundle/build-hkpsp.sh",
+  "python_packages_from": "builder-bundle.json",
+  "tools": [
+    {
+      "name": "pwsh",
+      "version": "7.6.10 (LTS) linux-x64",
+      "license": "MIT",
+      "url": "https://github.com/PowerShell/PowerShell/releases/tag/v7.6.10",
+      "download": true,
+      "bundle": "runtime/pwsh",
+      "exe": "pwsh",
+      "archive": "https://github.com/PowerShell/PowerShell/releases/download/v7.6.10/powershell-7.6.10-linux-x64.tar.gz",
+      "sha256": "e261cabc91c78a9afe8d1e5f24731ab0d38204735ab2ec94b0af55102652e10d"
+    },
+    {
+      "name": "python",
+      "version": "3.12.16 (python-build-standalone 20261110, install_only)",
+      "license": "PSF-2.0",
+      "url": "https://github.com/astral-sh/python-build-standalone/releases/tag/20261110",
+      "download": true,
+      "bundle": "runtime/python",
+      "exe": "bin/python3",
+      "archive": "https://github.com/astral-sh/python-build-standalone/releases/download/20261110/cpython-3.12.16%2B20261110-x86_64-unknown-linux-gnu-install_only.tar.gz",
+      "sha256": "c2f87d4b4e8db3abddb0f116c6ccfc503d0cbdbb9ee8faacddad1b679ec12e99",
+      "note": "unpack the tar.gz (it holds python/), then pip install --only-binary=:all: the python_packages"
+    },
+    {
+      "name": "dotnet-runtime",
+      "version": "8.0.34 linux-x64 (for ilspycmd, net8.0)",
+      "license": "MIT",
+      "url": "https://dotnet.microsoft.com/download/dotnet/8.0",
+      "download": true,
+      "bundle": "runtime/dotnet",
+      "exe": "dotnet",
+      "archive": "https://builds.dotnet.microsoft.com/dotnet/Runtime/8.0.34/dotnet-runtime-8.0.34-linux-x64.tar.gz",
+      "sha512": "3949c533b04b0f2b8ed7f6a595409806857891de07eca5ff2795c3ffecc5c373c8977ce296ea1124cef0890f8afeb3365a3bb8514d11a91ba79adb5c47c27ddb"
+    },
+    {
+      "name": "assetripper",
+      "version": "2.0.0 linux_x64",
+      "license": "GPL-3.0",
+      "url": "https://github.com/AssetRipper/AssetRipper/releases/tag/2.0.0",
+      "download": true,
+      "bundle": "runtime/AssetRipper",
+      "exe": "AssetRipper.GUI.Free",
+      "archive": "https://github.com/AssetRipper/AssetRipper/releases/download/2.0.0/AssetRipper_linux_x64.tar.xz",
+      "sha256": "6f5d4352d36795b944243eb3ec790ec37dbca6d6756e52605bc8616e042d384e"
+    },
+    {
+      "name": "ilspy",
+      "version": "ilspycmd 9.1.0.7988 (NuGet tool, net8.0 any)",
+      "license": "MIT",
+      "url": "https://www.nuget.org/packages/ilspycmd/9.1.0.7988",
+      "download": true,
+      "bundle": "runtime/ilspy",
+      "exe": "ilspycmd",
+      "archive": "https://api.nuget.org/v3-flatcontainer/ilspycmd/9.1.0.7988/ilspycmd.9.1.0.7988.nupkg",
+      "sha512_base64": "Uq8QWnPLyhif4Qr3TzbUpwl2GHmwKpbJoIS6Q71wtF8cTyLZ6zJ4ZDlQQrlHzOzBvJ8MRQQbzvJzK+ePtBzkgQ==",
+      "note": "unpack tools/net8.0/any of the nupkg, add tools/psp/bundle/ilspycmd-linux.sh as ilspycmd (chmod +x)"
+    },
+    {
+      "name": "tex3ds",
+      "version": "tex3ds v2.3.0 (devkitPro package 2.3.0-4)",
+      "license": "GPL-3.0",
+      "url": "https://github.com/devkitPro/tex3ds",
+      "download": true,
+      "bundle": "_private/tools/tex3ds",
+      "exe": "tex3ds",
+      "archive": "https://pkg.devkitpro.org/packages/linux/x86_64/tex3ds-2.3.0-4-x86_64.pkg.tar.zst",
+      "sha256": "70e10512d2f26801e0fd659e3a1a2e0639c896fac2147e821437fb165e7d0cc8",
+      "note": "opt/devkitpro/tools/bin/tex3ds and its COPYING"
+    },
+    {
+      "name": "ffmpeg",
+      "version": "n8.1.3-41-ga8029b6528 linux64-gpl-shared (BtbN autobuild-2026-11-25-12-41; 7.1 Linux builds are no longer published)",
+      "license": "GPL-3.0",
+      "url": "https://github.com/BtbN/FFmpeg-Builds",
+      "download": true,
+      "bundle": "runtime/ffmpeg",
+      "exe": "bin/ffmpeg",
+      "archive": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-11-25-12-41/ffmpeg-n8.1.3-41-ga8029b6528-linux64-gpl-shared-8.1.tar.xz",
+      "sha256": "fa01e2b8e3cbeef8f0a6fbee36a1fe48d17521e28af4a91d18f499cb79a3a1ce"
+    },
+    {
+      "name": "freetype",
+      "version": "the system libfreetype.so.6",
+      "license": "FTL",
+      "url": "https://freetype.org",
+      "system": "libfreetype.so.6",
+      "note": "present on desktop Linux and SteamOS; the builder names the package when it is missing"
+    }
+  ]
+}

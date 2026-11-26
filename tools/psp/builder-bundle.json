@@ -1,0 +1,124 @@
+{
+  "comment": "Pinned third-party tools of the player builder bundle (docs/tasks/psp-user-builder.md). 'local' entries are copied from the developer machine (paths relative to HKPSP_SOURCE_ROOT/_private/tools unless absolute); 'download' entries need a pinned archive and its SHA-256 before assembly. 'bundle' is where the file lands inside the bundle; bundle.json maps the builder's tool names to it.",
+  "python_packages": [
+    "numpy==2.5.4",
+    "pillow==13.0.0",
+    "UnityPy==1.25.2",
+    "soundfile==0.14.0",
+    "TypeTreeGeneratorAPI==0.0.10",
+    "archspec==0.2.7",
+    "astc-encoder-py==0.1.12",
+    "attrs==26.1.0",
+    "brotli==1.2.1",
+    "cffi==2.1.1",
+    "etcpak==0.9.15",
+    "fmod_toolkit==0.1.3",
+    "fsspec==2026.9.0",
+    "lz4==4.4.5",
+    "pycparser==3.12",
+    "pyfmodex==0.7.2",
+    "texture2ddecoder==1.0.6",
+    "typing_extensions==4.16.0"
+  ],
+  "tools": [
+    {
+      "name": "assetripper",
+      "version": "2.0.0",
+      "license": "GPL-3.0",
+      "url": "https://github.com/AssetRipper/AssetRipper/releases/tag/2.0.0",
+      "local": "AssetRipper-2.0.0",
+      "bundle": "runtime/AssetRipper",
+      "exe": "AssetRipper.GUI.Free.exe"
+    },
+    {
+      "name": "ilspy",
+      "version": "9.1.0.7988",
+      "license": "MIT",
+      "url": "https://github.com/icsharpcode/ILSpy/releases/tag/v9.1",
+      "local": "ilspy",
+      "bundle": "runtime/ilspy",
+      "exe": "ilspycmd.exe",
+      "note": "framework-dependent: needs the dotnet-runtime entry next to it"
+    },
+    {
+      "name": "freetype",
+      "version": "from Temurin JDK 21.0.12+1",
+      "license": "FTL",
+      "url": "https://adoptium.net/temurin/releases/",
+      "local": "rea-native/jdk-21.0.12.1+1/bin",
+      "bundle": "runtime/freetype",
+      "exe": "freetype.dll",
+      "files": [
+        "freetype.dll",
+        "vcruntime140.dll",
+        "vcruntime140_1.dll"
+      ]
+    },
+    {
+      "name": "tex3ds",
+      "version": "tex3ds v2.3.0 (devkitPro build of 2024-01-24)",
+      "license": "GPL-3.0",
+      "url": "https://github.com/devkitPro/tex3ds",
+      "local": "C:/devkitPro/tools/bin",
+      "bundle": "_private/tools/tex3ds",
+      "exe": "tex3ds.exe",
+      "files": [
+        "tex3ds.exe"
+      ]
+    },
+    {
+      "name": "ffmpeg",
+      "version": "7.1.1 full_build-shared (gyan.dev)",
+      "license": "GPL-3.0",
+      "url": "https://www.gyan.dev/ffmpeg/builds/",
+      "local": "ffmpeg-7.1.1/ffmpeg-7.1.1-full_build-shared/bin",
+      "bundle": "_private/tools/ffmpeg-7.1.1/ffmpeg-7.1.1-full_build-shared/bin",
+      "exe": "ffmpeg.exe",
+      "files": [
+        "ffmpeg.exe",
+        "avcodec-61.dll",
+        "avdevice-61.dll",
+        "avfilter-10.dll",
+        "avformat-61.dll",
+        "avutil-59.dll",
+        "postproc-58.dll",
+        "swresample-5.dll",
+        "swscale-8.dll"
+      ]
+    },
+    {
+      "name": "pwsh",
+      "version": "7.6.10 (LTS) portable zip",
+      "license": "MIT",
+      "url": "https://github.com/PowerShell/PowerShell/releases/tag/v7.6.10",
+      "download": true,
+      "bundle": "runtime/pwsh",
+      "exe": "pwsh.exe",
+      "archive": "https://github.com/PowerShell/PowerShell/releases/download/v7.6.10/PowerShell-7.6.10-win-x64.zip",
+      "sha256": "7d871531806eb1646264e4bbabd9f0c30c23355591bc756bb9909448c29ae166"
+    },
+    {
+      "name": "python",
+      "version": "3.12.16 (python-build-standalone 20261110, install_only)",
+      "license": "PSF-2.0",
+      "url": "https://github.com/astral-sh/python-build-standalone/releases/tag/20261110",
+      "download": true,
+      "bundle": "runtime/python",
+      "exe": "python.exe",
+      "archive": "https://github.com/astral-sh/python-build-standalone/releases/download/20261110/cpython-3.12.16%2B20261110-x86_64-pc-windows-msvc-install_only.tar.gz",
+      "sha256": "e23fe5b16926de1d81661b1a97352e89fb167549c55a6825796ccd0f32ec7f1b",
+      "note": "unpack the tar.gz (it holds python/), then pip install --only-binary=:all: the python_packages"
+    },
+    {
+      "name": "dotnet-runtime",
+      "version": "8.0.34 (for ilspycmd, net8.0)",
+      "license": "MIT",
+      "url": "https://dotnet.microsoft.com/download/dotnet/8.0",
+      "download": true,
+      "bundle": "runtime/dotnet",
+      "exe": "dotnet.exe",
+      "archive": "https://builds.dotnet.microsoft.com/dotnet/Runtime/8.0.34/dotnet-runtime-8.0.34-win-x64.zip",
+      "sha512": "d86d165a29dcdb71df23dd150a3fc5db6386fa55da5cb18c0c22889a0dab5071a3a2d852572e6cebfecf12b489870ac76243ae35665a746ed5b1011e7c68979d"
+    }
+  ]
+}

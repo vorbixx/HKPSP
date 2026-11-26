@@ -1,0 +1,17 @@
+* text=auto
+*.md text eol=lf
+*.cpp text eol=lf
+*.hpp text eol=lf
+*.h text eol=lf
+*.ps1 text eol=lf
+*.bat text eol=crlf
+*.sh text eol=lf
+Makefile text eol=lf
+*.mk text eol=lf
+.gitignore text eol=lf
+.gitattributes text eol=lf
+
+# Append-only shared docs: keep both sides on merge (parallel worktree branches).
+docs/progress-history.md merge=union
+docs/reverse-engineering.md merge=union
+docs/architecture.md merge=union

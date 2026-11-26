@@ -1,0 +1,319 @@
+{
+ "Hornet/HORNET_GREENPATH": {
+  "edits": [
+   [
+    22,
+    242,
+    ""
+   ]
+  ],
+  "entry": "HORNET_GREENPATH",
+  "sheet": "Hornet"
+ },
+ "Hornet/HORNET_GREENPATH#2": {
+  "edits": [
+   [
+    0,
+    28,
+    ""
+   ],
+   [
+    29,
+    30,
+    "'"
+   ],
+   [
+    89,
+    242,
+    ""
+   ]
+  ],
+  "entry": "HORNET_GREENPATH",
+  "sheet": "Hornet"
+ },
+ "Hornet/HORNET_GREENPATH#3": {
+  "edits": [
+   [
+    0,
+    95,
+    ""
+   ],
+   [
+    169,
+    242,
+    ""
+   ]
+  ],
+  "entry": "HORNET_GREENPATH",
+  "sheet": "Hornet"
+ },
+ "Hornet/HORNET_GREENPATH#4": {
+  "edits": [
+   [
+    0,
+    175,
+    ""
+   ],
+   [
+    211,
+    212,
+    "'"
+   ],
+   [
+    230,
+    231,
+    "'"
+   ]
+  ],
+  "entry": "HORNET_GREENPATH",
+  "sheet": "Hornet"
+ },
+ "Prompts/GET_DASH_2": {
+  "edits": [],
+  "entry": "GET_DASH_2",
+  "sheet": "Prompts"
+ },
+ "Prompts/GET_SHADOWDASH_2": {
+  "edits": [
+   [
+    0,
+    18,
+    "D"
+   ],
+   [
+    42,
+    48,
+    ""
+   ],
+   [
+    55,
+    77,
+    ""
+   ]
+  ],
+  "entry": "GET_SHADOWDASH_2",
+  "sheet": "Prompts"
+ },
+ "Prompts/GET_SUPERDASH_1": {
+  "edits": [],
+  "entry": "GET_SUPERDASH_1",
+  "sheet": "Prompts"
+ },
+ "Prompts/GET_SUPERDASH_2": {
+  "edits": [],
+  "entry": "GET_SUPERDASH_2",
+  "sheet": "Prompts"
+ },
+ "Prompts/GET_WALLJUMP_1": {
+  "edits": [],
+  "entry": "GET_WALLJUMP_1",
+  "sheet": "Prompts"
+ },
+ "Prompts/GET_WALLJUMP_2": {
+  "edits": [],
+  "entry": "GET_WALLJUMP_2",
+  "sheet": "Prompts"
+ },
+ "Prompts/PROMPT_FOCUS_EXPLAINER1A": {
+  "edits": [],
+  "entry": "PROMPT_FOCUS_EXPLAINER1A",
+  "sheet": "Prompts"
+ },
+ "Prompts/PROMPT_FOCUS_EXPLAINER1B": {
+  "edits": [],
+  "entry": "PROMPT_FOCUS_EXPLAINER1B",
+  "sheet": "Prompts"
+ },
+ "Prompts/PROMPT_FOCUS_EXPLAINER1B#2": {
+  "edits": [
+   [
+    29,
+    29,
+    ","
+   ]
+  ],
+  "entry": "PROMPT_FOCUS_EXPLAINER1B",
+  "sheet": "Prompts"
+ },
+ "Prompts/PROMPT_FOCUS_EXPLAINER2": {
+  "edits": [],
+  "entry": "PROMPT_FOCUS_EXPLAINER2",
+  "sheet": "Prompts"
+ },
+ "Prompts/TOLLBOOTH_BENCH": {
+  "edits": [
+   [
+    54,
+    55,
+    ""
+   ]
+  ],
+  "entry": "TOLLBOOTH_BENCH",
+  "sheet": "Prompts"
+ },
+ "Prompts/TOLLBOOTH_GATE": {
+  "edits": [
+   [
+    53,
+    54,
+    ""
+   ]
+  ],
+  "entry": "TOLLBOOTH_GATE",
+  "sheet": "Prompts"
+ },
+ "Prompts/TOLLBOOTH_LIFT": {
+  "edits": [
+   [
+    53,
+    54,
+    ""
+   ]
+  ],
+  "entry": "TOLLBOOTH_LIFT",
+  "sheet": "Prompts"
+ },
+ "Prompts/TOLLBOOTH_STAG": {
+  "edits": [],
+  "entry": "TOLLBOOTH_STAG",
+  "sheet": "Prompts"
+ },
+ "Prompts/TOLLBOOTH_STAG#2": {
+  "edits": [
+   [
+    53,
+    54,
+    ""
+   ]
+  ],
+  "entry": "TOLLBOOTH_STAG",
+  "sheet": "Prompts"
+ },
+ "Shaman/SHAMAN_KILLED_BLOCKER_2": {
+  "edits": [
+   [
+    119,
+    120,
+    "'"
+   ],
+   [
+    357,
+    358,
+    "'"
+   ],
+   [
+    389,
+    390,
+    "'"
+   ],
+   [
+    454,
+    455,
+    "'"
+   ]
+  ],
+  "entry": "SHAMAN_KILLED_BLOCKER_2",
+  "sheet": "Shaman"
+ },
+ "Shaman/SHAMAN_MEET": {
+  "edits": [
+   [
+    0,
+    72,
+    ""
+   ],
+   [
+    73,
+    349,
+    ""
+   ],
+   [
+    375,
+    427,
+    ""
+   ]
+  ],
+  "entry": "SHAMAN_MEET",
+  "sheet": "Shaman"
+ },
+ "Shaman/SHAMAN_OPEN_GATE": {
+  "edits": [
+   [
+    55,
+    56,
+    "'"
+   ],
+   [
+    66,
+    67,
+    "'"
+   ]
+  ],
+  "entry": "SHAMAN_OPEN_GATE",
+  "sheet": "Shaman"
+ },
+ "UI/CHARM_DESC_1": {
+  "edits": [
+   [
+    59,
+    67,
+    "\n\n"
+   ],
+   [
+    91,
+    92,
+    "'"
+   ],
+   [
+    153,
+    154,
+    ""
+   ]
+  ],
+  "entry": "CHARM_DESC_1",
+  "sheet": "UI"
+ },
+ "UI/CHARM_DESC_3": {
+  "edits": [
+   [
+    0,
+    46,
+    ""
+   ],
+   [
+    52,
+    55,
+    "oul"
+   ]
+  ],
+  "entry": "CHARM_DESC_3",
+  "sheet": "UI"
+ },
+ "UI/INV_DESC_NAIL1": {
+  "edits": [],
+  "entry": "INV_DESC_NAIL1",
+  "sheet": "UI"
+ },
+ "UI/INV_DESC_SPELL_FIREBALL1": {
+  "edits": [
+   [
+    0,
+    114,
+    ""
+   ]
+  ],
+  "entry": "INV_DESC_SPELL_FIREBALL1",
+  "sheet": "UI"
+ },
+ "UI/INV_DESC_SPELL_SCREAM1": {
+  "edits": [
+   [
+    31,
+    110,
+    ""
+   ]
+  ],
+  "entry": "INV_DESC_SPELL_SCREAM1",
+  "sheet": "UI"
+ }
+}

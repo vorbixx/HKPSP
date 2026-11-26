@@ -1,0 +1,50 @@
+"""BuildSettings indices for the Mines/Waterways region (city frontier excluded)."""
+
+SCENES = {
+    'Mines_02': 249,
+    'Mines_03': 250,
+    'Mines_04': 251,
+    'Mines_05': 252,
+    'Mines_06': 253,
+    'Mines_07': 254,
+    'Mines_11': 256,
+    'Mines_13': 257,
+    'Mines_16': 258,
+    'Mines_17': 259,
+    'Mines_18': 260,
+    'Mines_19': 262,
+    'Mines_20': 263,
+    'Mines_23': 264,
+    'Mines_24': 265,
+    'Mines_25': 266,
+    'Mines_29': 268,
+    'Mines_30': 269,
+    'Mines_31': 270,
+    'Mines_32': 271,
+    'Mines_34': 273,
+    'Mines_35': 274,
+    'Mines_36': 275,
+    'Mines_37': 276,
+    'Waterways_01': 349,
+    'Waterways_02': 350,
+    'Waterways_03': 351,
+    'Waterways_04': 352,
+    'Waterways_04b': 353,
+    'Waterways_05': 354,
+    'Waterways_06': 356,
+    'Waterways_07': 357,
+    'Waterways_08': 358,
+    'Waterways_09': 359,
+    'Waterways_12': 360,
+    'Waterways_13': 362,
+    'Waterways_14': 363,
+    'Waterways_15': 364,
+}
+
+# Original GameManager treats _boss as a subscene suffix; these contain additive
+# boss actors rather than independent room terrain/lighting (bosses are out of scope).
+ADDITIVE_SCENES = {
+    'Mines_18_boss': 261,
+    'Waterways_05_boss': 355,
+    'Waterways_12_boss': 361,
+}

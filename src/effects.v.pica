@@ -1,0 +1,14 @@
+.out position position
+.out uv0 texcoord0
+.out uv1 texcoord1
+.out uv2 texcoord2
+.out color color
+.constf white(1.0, 1.0, 1.0, 1.0)
+.proc main
+    mov position, v0
+    mov uv0, v1
+    mov uv1, v2
+    mov uv2, v3
+    mov color, white
+    end
+.end
