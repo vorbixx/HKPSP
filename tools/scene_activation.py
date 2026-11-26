@@ -90,18 +90,23 @@ class ActivationCompiler:
             expected = self._source_hashes.get(path)
             if expected is None and self._canonical_hashes is not None:
                 expected = self._canonical_hashes.get(path)
-            shared = _VERIFIED_READS.get(path) if SHARE_VERIFIED_READS and expected else None
-            if shared is not None and shared[0] == expected:
+            token = None
+            if SHARE_VERIFIED_READS and expected:
+                stat = path.stat()
+                token = (expected, stat.st_size, stat.st_mtime_ns)
+            shared = _VERIFIED_READS.get(path) if token else None
+            if shared is not None and shared[0] == token:
                 # Player builds: a second compiler in this process reuses records already
-                # checked against the same source hash instead of re-reading and re-parsing.
+                # checked against the same source hash, while size and mtime are unchanged,
+                # instead of re-reading and re-parsing them.
                 self._cache[path] = shared[1]
             else:
                 raw = path.read_bytes()
                 if expected and hashlib.sha256(raw).hexdigest() != expected:
                     raise ValueError('Changed activation source: ' + str(path))
                 self._cache[path] = json.loads(raw)
-                if SHARE_VERIFIED_READS and expected:
-                    _VERIFIED_READS[path] = (expected, self._cache[path])
+                if token:
+                    _VERIFIED_READS[path] = (token, self._cache[path])
         self._resolved_refs[Path(ref)] = path
         return self._cache[path]
 
