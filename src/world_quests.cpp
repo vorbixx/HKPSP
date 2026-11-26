@@ -188,12 +188,13 @@ bool WorldQuests::lemmShopNearby(Rect hero) const {
         hero.bottom<range.top&&hero.top>range.bottom;
 }
 bool WorldQuests::elderbugWalkedBy(Rect hero,bool visitedCrossroads,const SavedPlayerData& data) const {
-    // Entering the original Call Range happens before a new player can reach
-    // Elderbug from King's Pass. Only select the walked-by intro once the hero
-    // has actually crossed to the far side of his conversation range.
+    // King's Pass enters Town on the far left (gate x 1-2) and the well is on the
+    // right (x 181-189), so a new player walks up to Elderbug from his left. Only
+    // select the walked-by intro once the hero is right of his conversation range,
+    // on the way to the well (user report 2026-11-26: left side fired on arrival).
     const auto range=definition_.range;
     return present_&&definition_.event==WorldQuestEvent::Elderbug&&
-           hero.right<range.left&&hero.bottom<range.top&&hero.top>range.bottom&&
+           hero.left>range.right&&hero.bottom<range.top&&hero.top>range.bottom&&
            !visitedCrossroads&&!data.get("metElderbug")&&data.get("elderbug")==0;
 }
 bool WorldQuests::completed(WorldQuestEvent event,const CollectibleProgress& p) const {
