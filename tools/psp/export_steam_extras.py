@@ -66,6 +66,8 @@ JOBS = (
             scenes=('Tutorial_01', 'Menu_Title')),
     session('initial-fall', 'tools/extract_initial_fall.py'),
     session('bottom-map', 'tools/extract_map.py'),
+    # Greenpath, Fungal Wastes, Ancient Basin and Deepnest map pieces (tools/psp/transcode_map.py).
+    session('npc-regional-map', 'tools/extract_map.py', '--regional'),
     session('opening-blanker', 'tools/extract_opening_blanker.py'),
     session('plants', 'tools/extract_plants.py', '--port', '{port}'),
     session('plant-effects', 'tools/extract_plant_effects.py', '--port', '{port}'),
