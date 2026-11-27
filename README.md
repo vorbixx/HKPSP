@@ -31,7 +31,8 @@ You need:
 - your own Steam copy of Hollow Knight, version 1.5.12620 (Steam build
   22529139, the current public branch);
 - Windows 10/11 (64-bit) or Linux (x86-64);
-- about 35 GB of free disk space and a few hours for the first build.
+- about 35 GB of free disk space and about 5–6 hours for the first build
+  (measured on a 12-core PC with 32 GB of RAM; slower machines take longer).
 
 Steps:
 
