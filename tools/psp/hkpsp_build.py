@@ -159,6 +159,29 @@ def check_game(game, manifest):
     return build, SUPPORTED_BUILDS[build]
 
 
+def work_data_gb(work):
+    """GB already written by an earlier run (_private, build/psp); links into the game are skipped.
+    os.scandir entries carry their size on Windows, so no extra stat call per file."""
+    total, stack = 0, [work / '_private', work / 'build/psp']
+    while stack:
+        try:
+            entries = os.scandir(stack.pop())
+        except OSError:
+            continue
+        with entries:
+            for entry in entries:
+                try:
+                    if entry.is_symlink() or entry.is_junction():
+                        continue
+                    if entry.is_dir(follow_symlinks=False):
+                        stack.append(entry.path)
+                    else:
+                        total += entry.stat(follow_symlinks=False).st_size
+                except OSError:
+                    pass
+    return total / 2**30
+
+
 def check_work_dir(work, required_gb=REQUIRED_FREE_GB):
     """Return warnings; raise when the build cannot fit."""
     work.mkdir(parents=True, exist_ok=True)
@@ -169,6 +192,8 @@ def check_work_dir(work, required_gb=REQUIRED_FREE_GB):
     except OSError as error:
         raise BuildError(f'Cannot write to {work} ({error}). Unpack HKPSP in a folder you can write to.')
     free = shutil.disk_usage(work).free / 2**30
+    # A resumed build already holds part of its data; only the rest must still fit.
+    required_gb = max(4.0, required_gb - work_data_gb(work))
     if free < required_gb:
         raise BuildError(f'The build needs about {required_gb} GB free in {work}; {free:.1f} GB is free. '
                          'Free some space, or unpack HKPSP on another drive and run it from there.')
