@@ -5,8 +5,12 @@ folder containing Managed assemblies. Collection indices are session-specific.
 """
 import argparse
 import html
+import http.client
 import json
 import re
+import threading
+import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
@@ -16,12 +20,40 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class Client:
     def __init__(self, port=58291):
+        self.port = port
         self.base = f"http://127.0.0.1:{port}"
+        self._local = threading.local()
+
+    def _connection(self):
+        connection = getattr(self._local, "connection", None)
+        if connection is None:
+            connection = self._local.connection = http.client.HTTPConnection("127.0.0.1", self.port, timeout=120)
+        return connection
 
     def request(self, endpoint, **query):
-        url = self.base + endpoint + "?" + urllib.parse.urlencode(query)
-        with urllib.request.urlopen(url, timeout=120) as response:
-            return response.read()
+        # One kept-alive connection per thread: a new connection per request left thousands of
+        # sockets in TIME_WAIT and ran Windows out of ports (WSAENOBUFS 10055) on fast PCs.
+        path = endpoint + "?" + urllib.parse.urlencode(query)
+        for attempt in range(5):
+            connection = self._connection()
+            try:
+                connection.request("GET", path, headers={"Connection": "keep-alive"})
+                response = connection.getresponse()
+                body = response.read()
+                if response.will_close:
+                    connection.close()
+                    self._local.connection = None
+            except (OSError, http.client.HTTPException):
+                connection.close()
+                self._local.connection = None
+                if attempt == 4:
+                    raise
+                time.sleep(0.5 * 2 ** attempt)
+                continue
+            if response.status >= 400:
+                raise urllib.error.HTTPError(self.base + path, response.status, response.reason,
+                                             response.headers, None)
+            return body
 
     def search(self, query):
         page = self.request("/Search/View", q=query).decode()
