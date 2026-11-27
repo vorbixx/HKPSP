@@ -18,6 +18,24 @@ MAX_NODES = 2048
 # shared between the compilers one scene conversion builds (metadata and export_scene).
 SHARE_VERIFIED_READS = os.environ.get('HKPSP_FAST_CHECKPOINT') == '1'
 _VERIFIED_READS = {}
+_DIRECTORY_NAMES = {}
+
+
+def _source_exists(path):
+    """Player builds: one directory listing answers every lookup in that directory.
+
+    Source records are read-only during a conversion; 9k stat calls per room otherwise."""
+    if not SHARE_VERIFIED_READS:
+        return path.exists()
+    parent = os.path.normcase(os.path.abspath(path.parent))
+    names = _DIRECTORY_NAMES.get(parent)
+    if names is None:
+        try:
+            names = frozenset(os.path.normcase(name) for name in os.listdir(parent))
+        except OSError:
+            names = frozenset()
+        _DIRECTORY_NAMES[parent] = names
+    return os.path.normcase(path.name) in names
 MAX_TARGETS = 8192
 TARGET_KINDS = {'visual': 0, 'collider': 1, 'gate': 2, 'spawn': 3, 'hazard': 4, 'acid_water': 5}
 DEACTIVATORS = ('DeactivateIfPlayerdataFalse', 'DeactivateIfPlayerdataTrue')
@@ -75,7 +93,7 @@ class ActivationCompiler:
         resolved = self._resolved_refs.get(path)
         if resolved is None:
             if not path.is_absolute():
-                path = next((s / ref for s in self.sources if (s / ref).exists()), self.sources[0] / ref)
+                path = next((s / ref for s in self.sources if _source_exists(s / ref)), self.sources[0] / ref)
             path = Path(os.path.abspath(path))
             resolved = path
             if not any(path.is_relative_to(source) for source in self.sources):
