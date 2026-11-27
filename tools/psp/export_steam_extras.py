@@ -16,6 +16,8 @@ Job kinds:
 import argparse
 from dataclasses import dataclass, field
 import os
+import tempfile
+import shutil
 from pathlib import Path
 import subprocess
 import sys
@@ -187,6 +189,29 @@ def scene_levels(game_data, scenes):
     return tuple(scene if isinstance(scene, int) else indices[scene] for scene in scenes)
 
 
+def mirror_mantis_scenery():
+    """Give the Fungus2_15 gate room its level180 arena scenery.
+
+    The route export copies Fungus2_15 into _private/minimum-obstacles/mantis-15-room before
+    the mantis-scenery job writes visuals/level180 into the research scene, and scene-Fungus2_15
+    reads level180 from the gate room (eastern_rooms.scene_source). Without this copy the player
+    build stopped at scene-Fungus2_15 (FileNotFoundError on level180/room-visuals-map.json)."""
+    source = ROOT / '_private/research/crossroads-scenes/Fungus2_15/visuals/level180'
+    room = ROOT / '_private/minimum-obstacles/mantis-15-room/visuals'
+    target = room / 'level180'
+    if not room.is_dir() or not (source / 'room-visuals-map.json').is_file():
+        return
+    if (target / 'room-visuals-map.json').is_file():
+        return
+    with tempfile.TemporaryDirectory(prefix='.level180-', dir=room) as temporary:
+        pending = Path(temporary) / 'level180'
+        shutil.copytree(source, pending)
+        if target.exists():
+            shutil.rmtree(target)
+        pending.rename(target)
+    print(f'Copied Mantis arena scenery into {target.relative_to(ROOT)}', flush=True)
+
+
 def run_job(job, python, environment, log):
     # Same interpreter flags as the regeneration rules: the script folder stays
     # on sys.path for the exporters' sibling imports.
@@ -249,6 +274,7 @@ def main(argv=None):
     if failed:
         print(f'Failed extra exports ({len(failed)}): {", ".join(failed)}. See {log}.', flush=True)
         return 1
+    mirror_mantis_scenery()
     print(f'Extra exports ready: {len(selected)} jobs', flush=True)
     return 0
 
