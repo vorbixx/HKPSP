@@ -361,6 +361,10 @@ try {
         $log = Join-Path $logs "$($step.Key).log"
         "Starting $($step.Key). Log at $log"
         $arguments = $step.Value
+        # Only regen.py (the resources step) reads the commit:N floor. validation-lock.ps1,
+        # heavy-admission.ps1 and regen_memory.py in the psp and package steps parse a plain
+        # number; with commit:2 the psp step failed at once (laptop 2026-11-27).
+        $env:HK3DS_WRITE_MIN_FREE_GB = if ($step.Key -eq 'resources' -and -not $oldMinFree) { 'commit:2' } else { $oldMinFree }
         & $pwsh -NoProfile -File @arguments *> $log
         if ($LASTEXITCODE) {
             Get-Content -LiteralPath $log -Tail 12
