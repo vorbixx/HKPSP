@@ -197,6 +197,10 @@ def inventory(root, facing_root=None):
         if family == 'greenpath-enemies':
             aliases = {p: (file, lib, a) for _, p, _, file, lib, a in tables['ACTORS']}
         rows_path = research/family/'source-components.json'
+        if not rows_path.exists():
+            # Player builds keep the same snapshot only under converted/<family>-source
+            # (convert_greenpath_enemies.py --snapshot); without it 9 Greenpath actors had no scale.
+            rows_path = converted/(family+'-source')/'source-components.json'
         rows = read_source(rows_path) if rows_path.exists() else []
         for prefix in prefixes:
             alias = aliases.get(prefix, [None, None, {}])[-1]

@@ -713,6 +713,12 @@ def main():
     actors = inventory(args.source_root, args.output.parent)
     result = export(args.source_root, actors, args.output)
     missing = sum(r['verdict'] != 'ok' for r in result.values())
+    if args.header and missing and os.environ.get('HKPSP_FAST_CHECKPOINT') == '1':
+        # Player builds ship the prebuilt EBOOT, which already contains this header; the PSP
+        # data steps read only config.json (instance scales). Keep the tracked header.
+        unresolved = sorted(k for k, r in result.items() if r['verdict'] != 'ok')
+        print(f'facing export: {len(result)} actors; header kept, unresolved: {", ".join(unresolved)}')
+        return 0
     if args.header:
         write_header(result, args.header)
     print(f'facing export: {len(result)} actors, {missing} unresolved')
