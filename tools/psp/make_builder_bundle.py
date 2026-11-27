@@ -110,6 +110,19 @@ def assemble(manifest, tools_dir, downloads, output):
     return bundle
 
 
+def add_msvcp140(site):
+    """Put msvcp140.dll next to python.exe. astc_encoder (used by UnityPy) imports it by name, and a
+    clean Windows without the Visual C++ Redistributable does not have it; python.exe's folder is
+    searched first. numpy ships the same DLL under a hashed name, pinned with the numpy wheel."""
+    target = site.parents[1] / 'msvcp140.dll'
+    if target.exists():
+        return
+    copies = sorted((site / 'numpy.libs').glob('msvcp140-*.dll'))
+    if not copies:
+        raise SystemExit('numpy.libs has no msvcp140-*.dll to place beside python.exe for astc_encoder.')
+    shutil.copy2(copies[0], target)
+
+
 def git(*args, root=ROOT):
     return subprocess.run([GIT, '-C', str(root), *args], check=True, capture_output=True).stdout
 
@@ -184,6 +197,7 @@ def main(argv=None):
     if args.platform == 'windows' and site.is_dir():
         # Owner-only temp folders broke non-admin builds; see bundle/sitecustomize.py.
         shutil.copy2(ROOT / 'tools/psp/bundle/sitecustomize.py', site / 'sitecustomize.py')
+        add_msvcp140(site)
     if args.release:
         info = add_release(args.output, args.platform, eboot=args.eboot, pwsh=args.pwsh)
         bundle['prebuilt'] = 'prebuilt'
