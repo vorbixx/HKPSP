@@ -50,8 +50,22 @@ def fit_curve(serialized):
     # Relative luminance error protects dark scenery from a fit dominated by
     # bright samples. The floor keeps zero/near-zero values finite; this changes
     # only offline coefficients, never authored ambient or the runtime pass.
-    def error(values):return sum((tev_curve(values,x)-v)**2/(16+v)
-                                 for x,v in enumerate(expected))
+    # Same per-sample terms as tev_curve, computed for all 256 inputs at once and summed in
+    # order, so every candidate scores bit-identically; repeated candidates reuse their score.
+    import numpy as np
+    xs=np.arange(256)/255;target=np.array(expected,dtype=float);weight=16+target
+    byte=lambda v:np.clip(np.floor(v+.5),0,255)
+    scores={}
+    def error(values):
+        key=tuple(values)
+        if key not in scores:
+            a,b,c=key
+            v=byte(2*(b*xs+a*(1-xs)))
+            v=byte(c*xs+v*(1-xs))
+            v=byte(v*(1-xs)+128*xs)
+            v=byte(2*v*xs)
+            scores[key]=sum((((v-target)**2)/weight).tolist())
+        return scores[key]
     best=[64,64,128];score=error(best)
     for step in (64,32,16,8,4,2,1):
         for _ in range(16):
