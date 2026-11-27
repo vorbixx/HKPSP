@@ -4,7 +4,6 @@ Run through validation-lock.ps1 -Exclusive. Inputs are the immutable private
 original copy. No source image is synthesized and the server is always stopped.
 """
 import argparse
-import errno
 import os
 import re
 from pathlib import Path
@@ -42,9 +41,9 @@ def run(port, output, *, scene='Crossroads_03', level=39, extractor=extract, inp
         if source.is_file() and not target.exists():
             try:
                 os.link(source, target)
-            except OSError as error:
-                if error.errno != errno.EXDEV and getattr(error, 'winerror', None) != 17:
-                    raise
+            except OSError:
+                # Linking needs write access to the game file; a read-only or protected game
+                # folder (another volume, locked-down Steam library) denies it. Copy instead.
                 shutil.copy2(source, target)
     if not (inputs / 'Managed').exists():
         shutil.copytree(original / 'Managed', inputs / 'Managed')
