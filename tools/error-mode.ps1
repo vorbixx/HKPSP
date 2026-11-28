@@ -4,6 +4,8 @@
 # patcher waited 40+ min under such a box while holding shared-private.lock, and seven agents queued
 # behind it (22:36 python/g++/git start failures waited the same way).
 function Disable-ErrorDialogs {
+    # SetErrorMode is a Windows call; on Linux there are no error dialogs to suppress (issue #1).
+    if (-not $IsWindows -and $PSVersionTable.PSEdition -eq 'Core') { $env:DOTNET_DbgEnableMiniDump = '0'; return }
     if (-not ('HK3DS.ErrorMode' -as [type])) {
         Add-Type -Namespace HK3DS -Name ErrorMode -MemberDefinition '
             [System.Runtime.InteropServices.DllImport("kernel32.dll")] public static extern uint SetErrorMode(uint mode);

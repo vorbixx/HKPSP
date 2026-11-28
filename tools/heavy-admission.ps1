@@ -7,10 +7,13 @@
 #   HK3DS_HEAVY_MAX_CPU          CPU busy percent above which new heavy work waits (default 85)
 #   HK3DS_HEAVY_MAX_CPU_WAIT_MINUTES  then it runs anyway, so it never starves (default 15)
 #   HK3DS_HEAVY_PRIORITY         priority class for the command and its children (default BelowNormal)
+# Windows asks kernel32; Linux reads /proc (issue #1: GlobalMemoryStatusEx is not on Linux, so every regen
+# failed with "Value cannot be null (path1)"). Elsewhere memory and CPU count as free: never block a build.
 if (-not ('HK3DS.ValidationMemory' -as [type])) {
     Add-Type -TypeDefinition @'
 using System;
 using System.ComponentModel;
+using System.IO;
 using System.Runtime.InteropServices;
 namespace HK3DS {
     public static class ValidationMemory {
@@ -23,18 +26,33 @@ namespace HK3DS {
         [DllImport("kernel32.dll", SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
         private static extern bool GlobalMemoryStatusEx(ref MemoryStatus status);
-        public static ulong AvailableBytes() {
+        private static MemoryStatus Windows() {
             var status = new MemoryStatus { Length = (uint)Marshal.SizeOf<MemoryStatus>() };
             if (!GlobalMemoryStatusEx(ref status))
                 throw new Win32Exception(Marshal.GetLastWin32Error());
-            return status.AvailablePhysical;
+            return status;
+        }
+        // /proc/meminfo field in bytes; null when the file or field is missing.
+        public static ulong? MemInfo(string field) {
+            if (!File.Exists("/proc/meminfo")) return null;
+            foreach (var line in File.ReadAllLines("/proc/meminfo")) {
+                if (!line.StartsWith(field + ":")) continue;
+                var parts = line.Substring(field.Length + 1).Trim().Split(' ');
+                ulong kb;
+                if (ulong.TryParse(parts[0], out kb)) return kb * 1024UL;
+            }
+            return null;
+        }
+        public static ulong AvailableBytes() {
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) return Windows().AvailablePhysical;
+            return MemInfo("MemAvailable") ?? ulong.MaxValue;
         }
         // Commit still available (RAM + page file); no WMI, which Codex sandboxes deny.
         public static ulong AvailableCommitBytes() {
-            var status = new MemoryStatus { Length = (uint)Marshal.SizeOf<MemoryStatus>() };
-            if (!GlobalMemoryStatusEx(ref status))
-                throw new Win32Exception(Marshal.GetLastWin32Error());
-            return status.AvailablePageFile;
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) return Windows().AvailablePageFile;
+            var ram = MemInfo("MemAvailable");
+            if (ram == null) return ulong.MaxValue;
+            return ram.Value + (MemInfo("SwapFree") ?? 0UL);
         }
     }
 }
@@ -44,6 +62,7 @@ if (-not ('HK3DS.ValidationCpu' -as [type])) {
     Add-Type -TypeDefinition @'
 using System;
 using System.ComponentModel;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading;
 namespace HK3DS {
@@ -51,13 +70,31 @@ namespace HK3DS {
         [DllImport("kernel32.dll", SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
         private static extern bool GetSystemTimes(out long idle, out long kernel, out long user);
-        // Percent of all logical processors busy over the sample (kernel time includes idle).
+        // Idle and total ticks; false when this system has neither GetSystemTimes nor /proc/stat.
+        private static bool Times(out double idle, out double total) {
+            idle = 0; total = 0;
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) {
+                long i, k, u;
+                if (!GetSystemTimes(out i, out k, out u)) throw new Win32Exception(Marshal.GetLastWin32Error());
+                idle = i; total = k + u;   // kernel time includes idle
+                return true;
+            }
+            if (!File.Exists("/proc/stat")) return false;
+            var fields = File.ReadAllLines("/proc/stat")[0].Split((char[])null, StringSplitOptions.RemoveEmptyEntries);
+            for (int n = 1; n < fields.Length && n <= 8; n++) {
+                double value = double.Parse(fields[n], System.Globalization.CultureInfo.InvariantCulture);
+                total += value;
+                if (n == 4 || n == 5) idle += value;   // idle, iowait
+            }
+            return true;
+        }
+        // Percent of all logical processors busy over the sample.
         public static double BusyPercent(int sampleMilliseconds) {
-            long i1, k1, u1, i2, k2, u2;
-            if (!GetSystemTimes(out i1, out k1, out u1)) throw new Win32Exception(Marshal.GetLastWin32Error());
+            double i1, t1, i2, t2;
+            if (!Times(out i1, out t1)) return 0;
             Thread.Sleep(sampleMilliseconds);
-            if (!GetSystemTimes(out i2, out k2, out u2)) throw new Win32Exception(Marshal.GetLastWin32Error());
-            double total = (k2 - k1) + (u2 - u1);
+            if (!Times(out i2, out t2)) return 0;
+            double total = t2 - t1;
             return total <= 0 ? 0 : 100.0 * (total - (i2 - i1)) / total;
         }
     }
