@@ -1052,8 +1052,11 @@ def transcode(package: Path, visual: str, page_pattern: str, out: Path, scene: s
         for index, image in enumerate(particles, first_sprite):
             baked[index] = (image, (-.5, -.5, .5, .5), {})
     tiles = []
+    # A room sprite no draw, swap, switch or transform uses is never on screen. Keep its index but pack it
+    # as one texel: player builds export extra unused sprites (Crossroads_10: 58 of 233, 5 -> 16 pages).
+    packed_factors = [(0.0, 0.0) if f is None else f for f in factors]
     sizes, page_count, page_stats, sprite_bytes = build_pages(Image, package, page_pattern, table.pages,
-                                                              table.sprites, factors, out, baked, tiles,
+                                                              table.sprites, packed_factors, out, baked, tiles,
                                                               extra_pages=extra_pages)
     version = 2 if tiles else PSR_VERSION
     header = b"PSR1" + struct.pack("<6I", version, PAGE, page_count, len(sizes), len(table.draws),
